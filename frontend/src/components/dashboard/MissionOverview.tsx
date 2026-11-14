@@ -1,8 +1,19 @@
 import React from 'react';
-import { Rocket, ShieldCheck, Users, Activity, TrendingUp, BookOpen, ArrowRight } from 'lucide-react';
+import {
+  Rocket,
+  ShieldCheck,
+  Users,
+  Activity,
+  TrendingUp,
+  BookOpen,
+  ArrowRight,
+  Brain,
+  Bell,
+} from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement } from '../../types/measurement';
 import { ConnectionState } from '../../types/api';
+import { AssessmentResponse } from '../../types/assessment';
 
 interface MissionOverviewProps {
   astronauts: Astronaut[];
@@ -10,9 +21,14 @@ interface MissionOverviewProps {
   measurements: Measurement[];
   totalMeasurements: number;
   selectedAstronaut: Astronaut | null;
-  connectionState: ConnectionState;
+  connectionState?: ConnectionState;
+  activeAlertsCount?: number;
+  staleTelemetryCount?: number;
+  latestAssessment?: AssessmentResponse | null;
   onExploreRoster: () => void;
   onViewTelemetry: () => void;
+  onViewIntelligence: () => void;
+  onViewAlerts: () => void;
   onOpenAnatomy: () => void;
   onOpenBaselines?: () => void;
   onOpenCatalog?: () => void;
@@ -24,9 +40,14 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
   measurements,
   totalMeasurements,
   selectedAstronaut,
-  connectionState,
+  connectionState = 'connected',
+  activeAlertsCount = 0,
+  staleTelemetryCount = 0,
+  latestAssessment = null,
   onExploreRoster,
   onViewTelemetry,
+  onViewIntelligence,
+  onViewAlerts,
   onOpenAnatomy,
   onOpenBaselines,
   onOpenCatalog,
@@ -38,15 +59,15 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Hero Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Monitored Crew */}
+      {/* High-Level Overview Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* Crew Roster */}
         <div
           onClick={onExploreRoster}
-          className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card cursor-pointer hover:border-telemetry-cyan/60 transition-colors"
+          className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card cursor-pointer hover:border-space-600 transition-colors"
         >
           <div className="flex items-center justify-between text-space-400">
-            <span className="font-mono text-xs uppercase tracking-wider">Monitored Crew</span>
+            <span className="font-mono text-xs uppercase tracking-wider">Active Crew</span>
             <Users className="h-4 w-4 text-telemetry-cyan" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
@@ -60,10 +81,66 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
           </p>
         </div>
 
-        {/* Telemetry Observations */}
-        <div className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card">
+        {/* Health Intelligence Status */}
+        <div
+          onClick={onViewIntelligence}
+          className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card cursor-pointer hover:border-space-600 transition-colors"
+        >
           <div className="flex items-center justify-between text-space-400">
-            <span className="font-mono text-xs uppercase tracking-wider">Telemetry Samples</span>
+            <span className="font-mono text-xs uppercase tracking-wider">Health Status Tier</span>
+            <Brain className="h-4 w-4 text-telemetry-cyan" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span
+              className={`font-mono text-lg font-bold uppercase ${
+                latestAssessment?.overall_classification === 'routine'
+                  ? 'text-telemetry-emerald'
+                  : latestAssessment?.overall_classification === 'needs_attention'
+                  ? 'text-telemetry-amber'
+                  : latestAssessment?.overall_classification === 'medical_review_recommended'
+                  ? 'text-telemetry-rose'
+                  : 'text-space-200'
+              }`}
+            >
+              {latestAssessment ? latestAssessment.overall_classification.replace(/_/g, ' ') : 'NOMINAL'}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-space-400 font-mono truncate">
+            {selectedAstronaut ? selectedAstronaut.name : 'Crew overview'}
+          </p>
+        </div>
+
+        {/* Operational Alerts */}
+        <div
+          onClick={onViewAlerts}
+          className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card cursor-pointer hover:border-space-600 transition-colors"
+        >
+          <div className="flex items-center justify-between text-space-400">
+            <span className="font-mono text-xs uppercase tracking-wider">Active Alerts</span>
+            <Bell className={`h-4 w-4 ${activeAlertsCount > 0 ? 'text-telemetry-rose animate-bounce' : 'text-space-400'}`} />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span
+              className={`font-mono text-3xl font-bold ${
+                activeAlertsCount > 0 ? 'text-telemetry-rose' : 'text-telemetry-emerald'
+              }`}
+            >
+              {activeAlertsCount}
+            </span>
+            <span className="text-xs text-space-400 font-mono">Unresolved</span>
+          </div>
+          <p className="mt-1 text-[11px] text-space-400 font-mono">
+            {activeAlertsCount > 0 ? 'Immediate operator attention required' : 'No critical deviations pending'}
+          </p>
+        </div>
+
+        {/* Telemetry Stream Freshness */}
+        <div
+          onClick={onViewTelemetry}
+          className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card cursor-pointer hover:border-space-600 transition-colors"
+        >
+          <div className="flex items-center justify-between text-space-400">
+            <span className="font-mono text-xs uppercase tracking-wider">Telemetry Stream</span>
             <Activity className="h-4 w-4 text-telemetry-emerald" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
@@ -73,7 +150,11 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
             <span className="text-xs text-space-400 font-mono">Packets</span>
           </div>
           <p className="mt-1 text-[11px] text-space-400 font-mono">
-            {loadedCount} currently loaded into view
+            {staleTelemetryCount > 0 ? (
+              <span className="text-telemetry-amber font-semibold">⚠️ {staleTelemetryCount} stream(s) stale</span>
+            ) : (
+              <span className="text-telemetry-emerald">● {loadedCount} loaded in view</span>
+            )}
           </p>
         </div>
 
@@ -123,27 +204,49 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
       <div className="rounded-lg bg-space-850 border border-space-700/80 p-5 shadow-hud-card font-mono">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-space-800">
           <div>
-            <span className="text-xs text-space-500 uppercase tracking-wider block">
-              Active Crew Specialist Focus
-            </span>
-            <h2 className="text-xl font-bold text-space-100 mt-0.5">
-              {selectedAstronaut?.name || 'No Astronaut Selected'}
-            </h2>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-space-400">
-              <span>Role: <strong className="text-space-200">{selectedAstronaut?.crew_role}</strong></span>
-              <span>•</span>
-              <span>Mission: <strong className="text-telemetry-cyan">{selectedAstronaut?.mission_name}</strong></span>
-              <span>•</span>
-              <span>Flight Day: <strong className="text-space-200">Day {selectedAstronaut?.mission_day}</strong></span>
+            <div className="flex items-center gap-2">
+              <Rocket className="h-5 w-5 text-telemetry-cyan" />
+              <h2 className="text-base font-bold uppercase tracking-wide text-space-100">
+                COSMOLOOKUP Mission Observation &amp; Intelligence Deck
+              </h2>
             </div>
+            {selectedAstronaut ? (
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-space-400">
+                <span>Crew Focus: <strong className="text-telemetry-cyan font-bold">{selectedAstronaut.name}</strong></span>
+                <span>•</span>
+                <span>Role: <strong className="text-space-200">{selectedAstronaut.crew_role}</strong></span>
+                <span>•</span>
+                <span>Mission: <strong className="text-space-200">{selectedAstronaut.mission_name}</strong></span>
+                <span>•</span>
+                <span>Flight Day: <strong className="text-telemetry-amber">Day {selectedAstronaut.mission_day}</strong></span>
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-space-300 max-w-2xl leading-relaxed">
+                Real-time physiological observation, personal baseline tracking, and explainable trend intelligence for deep-space missions.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              onClick={onViewIntelligence}
+              className="px-3.5 py-2 rounded bg-telemetry-cyan/20 hover:bg-telemetry-cyan/30 border border-telemetry-cyan/50 text-xs text-telemetry-cyan font-semibold transition-colors flex items-center gap-1.5"
+            >
+              <Brain className="h-3.5 w-3.5" />
+              <span>Health Intelligence</span>
+            </button>
+            <button
               onClick={onViewTelemetry}
-              className="px-3.5 py-2 rounded bg-telemetry-cyan hover:bg-telemetry-cyan/90 text-xs font-bold text-space-950 transition-colors"
+              className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs text-space-100 transition-colors"
             >
               Telemetry Stream
+            </button>
+            <button
+              onClick={onViewAlerts}
+              className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs text-space-200 transition-colors flex items-center gap-1.5"
+            >
+              <Bell className="h-3.5 w-3.5 text-telemetry-rose" />
+              <span>Alerts Hub ({activeAlertsCount})</span>
             </button>
             {onOpenBaselines && (
               <button
@@ -155,18 +258,24 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
             )}
             <button
               onClick={onOpenAnatomy}
-              className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs text-space-200 transition-colors"
+              className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs text-space-300 transition-colors"
             >
-              3D Anatomy Map
+              3D Anatomy
             </button>
             {onOpenCatalog && (
               <button
                 onClick={onOpenCatalog}
                 className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs text-space-300 transition-colors"
               >
-                Catalog Dictionary
+                Measurement Catalog
               </button>
             )}
+            <button
+              onClick={onExploreRoster}
+              className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs text-space-200 transition-colors"
+            >
+              Crew Roster
+            </button>
           </div>
         </div>
 
@@ -268,3 +377,4 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
     </div>
   );
 };
+export default MissionOverview;

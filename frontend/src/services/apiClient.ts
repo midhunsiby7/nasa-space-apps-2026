@@ -1,3 +1,9 @@
+/**
+ * COSMOLOOKUP — Central Unified API Client
+ * Reconciles Phase 3B/4 (PR #10: Measurement Catalog, Baselines, Context/Modality Filters)
+ * and Phase 2C/D/E (PR #11: Trends, Freshness, Assessments, Alerts Lifecycle).
+ */
+
 import { Astronaut, AstronautListResponse } from '../types/astronaut';
 import { MeasurementListResponse } from '../types/measurement';
 import { MeasurementCatalogResponse } from '../types/catalog';
@@ -7,29 +13,55 @@ import {
   BaselineCalculationRequest,
 } from '../types/baseline';
 import {
+  AstronautTrendsResponse,
+  TelemetryFreshnessResponse,
+} from '../types/trend';
+import {
+  AssessmentResponse,
+  AssessmentListResponse,
+  AssessmentGenerationRequest,
+} from '../types/assessment';
+import {
+  AlertResponse,
+  AlertListResponse,
+} from '../types/alert';
+import {
   ListAstronautsParams,
   GetMeasurementsParams,
   ConnectionState,
   ApiError,
-  ApiErrorResponse,
   HealthCheckResponse,
 } from '../types/api';
-import { DEMO_ASTRONAUTS, DEMO_MEASUREMENTS, DEMO_CATALOG, DEMO_BASELINES } from './demoData';
+import {
+  DEMO_ASTRONAUTS,
+  DEMO_MEASUREMENTS,
+  DEMO_CATALOG,
+  DEMO_BASELINES,
+  DEMO_TRENDS,
+  DEMO_FRESHNESS,
+  DEMO_ASSESSMENTS,
+  DEMO_ALERTS,
+} from './demoData';
+
+export { ApiError };
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
 const REQUEST_TIMEOUT_MS = 5000;
 
 class ApiClient {
-  private connectionState: ConnectionState = 'connecting';
+  private connectionState: ConnectionState = 'connected';
   private connectionListeners: ((state: ConnectionState) => void)[] = [];
   private demoModeEnabled: boolean = false;
+
+  // Local mutable copy of demo alerts so user can test Acknowledge and Resolve interactively
+  private mutableDemoAlerts: AlertResponse[] = [...DEMO_ALERTS];
 
   public getConnectionState(): ConnectionState {
     return this.connectionState;
   }
 
   public isDemoMode(): boolean {
-    return this.demoModeEnabled;
+    return this.demoModeEnabled || this.connectionState === 'offline_demo';
   }
 
   public setDemoMode(enabled: boolean): void {
@@ -57,84 +89,125 @@ class ApiClient {
   }
 
   /**
-   * Internal fetch wrapper supporting timeouts and JSON error parsing
+   * Helper to perform standardized GET requests with clear distinction between
+   * network failure (offline demo activation) and legitimate HTTP error responses.
    */
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async getJson<T>(url: string, fallbackFn: () => T): Promise<T> {
+    if (this.isDemoMode()) {
+      return fallbackFn();
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-
+    let response: Response;
     try {
-      const response = await fetch(url, {
-        ...options,
+      response = await fetch(url, {
         signal: controller.signal,
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': options.body ? 'application/json' : undefined as any,
-          ...(options.headers || {}),
-        },
+        headers: { Accept: 'application/json' },
       });
-
+    } catch (networkErr: any) {
       clearTimeout(timeoutId);
-
-      // Handle HTTP error responses
-      if (!response.ok) {
-        let errorData: ApiErrorResponse | null = null;
-        try {
-          errorData = await response.json();
-        } catch {
-          // Response body was not JSON
-        }
-
-        const code = errorData?.error?.code || `HTTP_${response.status}`;
-        const message =
-          errorData?.error?.message || `Request failed with HTTP status ${response.status} (${response.statusText})`;
-        const details = errorData?.error?.details;
-
-        throw new ApiError(message, code, response.status, details);
-      }
-
-      // Successful HTTP response
-      this.setConnectionState('connected');
-      return (await response.json()) as T;
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-
-      // Distinguish between explicit HTTP ApiErrors and Network/Timeout errors
-      if (err instanceof ApiError) {
-        throw err;
-      }
-
-      // Network unreachable, connection refused, or timeout
-      const isTimeout = err.name === 'AbortError';
-      const netMsg = isTimeout
-        ? `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s while reaching backend service.`
-        : 'Backend service is unreachable. Verify that Uvicorn is running on http://127.0.0.1:8000.';
-
-      this.setConnectionState(this.demoModeEnabled ? 'offline_demo' : 'offline');
-
-      throw new ApiError(netMsg, isTimeout ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR', 0, {
-        originalError: err.message,
-      });
+      console.warn(`Backend API unreachable at ${url}, activating offline demo:`, networkErr);
+      this.setConnectionState('offline_demo');
+      return fallbackFn();
     }
+    clearTimeout(timeoutId);
+
+    // Backend server is alive and reachable
+    this.setConnectionState('connected');
+
+    if (!response.ok) {
+      let errorData: any = {};
+      try {
+        errorData = await response.json();
+      } catch {
+        // non-JSON payload
+      }
+      const errObj = errorData.error || errorData;
+      throw new ApiError(
+        response.status,
+        errObj.message || `API error ${response.status}: ${response.statusText}`,
+        errObj.code,
+        errObj.details
+      );
+    }
+
+    return (await response.json()) as T;
   }
 
   /**
-   * Check Backend System Health
-   * GET /api/v1/health or /health
+   * Helper to perform standardized POST requests.
+   * On an active connection, HTTP errors are thrown directly to avoid unsafe silent fallbacks.
    */
-  public async checkHealth(): Promise<HealthCheckResponse | null> {
+  private async postJson<T, P>(url: string, payload: P, fallbackFn: () => T): Promise<T> {
+    if (this.isDemoMode()) {
+      return fallbackFn();
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    let response: Response;
     try {
-      this.setConnectionState('connecting');
-      const data = await this.request<HealthCheckResponse>('/health');
+      response = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (networkErr: any) {
+      clearTimeout(timeoutId);
+      console.warn(`Backend network unreachable during POST to ${url}, using offline demo:`, networkErr);
+      this.setConnectionState('offline_demo');
+      return fallbackFn();
+    }
+    clearTimeout(timeoutId);
+
+    // Server is reachable
+    this.setConnectionState('connected');
+
+    if (!response.ok) {
+      let errorData: any = {};
+      try {
+        errorData = await response.json();
+      } catch {
+        // non-JSON
+      }
+      const errObj = errorData.error || errorData;
+      throw new ApiError(
+        response.status,
+        errObj.message || `API error ${response.status}: ${response.statusText}`,
+        errObj.code,
+        errObj.details
+      );
+    }
+
+    return (await response.json()) as T;
+  }
+
+  /* =========================================================================
+   * 0. SYSTEM HEALTH & CATALOG ENDPOINTS
+   * ========================================================================= */
+
+  public async checkHealth(): Promise<HealthCheckResponse | null> {
+    const rootUrl = BASE_URL.replace(/\/api\/v1$/, '');
+    const healthUrl = `${rootUrl}/health`;
+
+    try {
+      const res = await fetch(healthUrl, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error(`Health check returned HTTP ${res.status}`);
+      const data = (await res.json()) as HealthCheckResponse;
       this.setConnectionState('connected');
       return data;
-    } catch (err: any) {
-      if (err.statusCode === 0) {
-        this.setConnectionState(this.demoModeEnabled ? 'offline_demo' : 'offline');
+    } catch {
+      if (this.demoModeEnabled) {
+        this.setConnectionState('offline_demo');
       } else {
-        this.setConnectionState('error');
+        this.setConnectionState('offline');
       }
       return null;
     }
@@ -144,71 +217,57 @@ class ApiClient {
    * GET /api/v1/measurements/catalog
    */
   public async getMeasurementCatalog(): Promise<MeasurementCatalogResponse> {
-    if (this.demoModeEnabled) {
-      return DEMO_CATALOG;
-    }
-
-    try {
-      return await this.request<MeasurementCatalogResponse>('/measurements/catalog');
-    } catch (err: any) {
-      if (err.statusCode === 0 && this.demoModeEnabled) {
-        return DEMO_CATALOG;
-      }
-      throw err;
-    }
+    const url = `${BASE_URL}/measurements/catalog`;
+    return this.getJson<MeasurementCatalogResponse>(url, () => DEMO_CATALOG);
   }
+
+  /* =========================================================================
+   * 1. ASTRONAUT ROSTER ENDPOINTS
+   * ========================================================================= */
 
   /**
    * GET /api/v1/astronauts
    */
   public async getAstronauts(params?: ListAstronautsParams): Promise<AstronautListResponse> {
-    if (this.demoModeEnabled) {
-      return this.getDemoAstronauts(params);
-    }
+    const url = new URL(`${BASE_URL}/astronauts`);
+    if (params?.mission_name) url.searchParams.set('mission_name', params.mission_name);
+    if (params?.limit !== undefined) url.searchParams.set('limit', params.limit.toString());
+    if (params?.offset !== undefined) url.searchParams.set('offset', params.offset.toString());
 
-    const query = new URLSearchParams();
-    if (params?.mission_name) query.set('mission_name', params.mission_name);
-    if (params?.limit !== undefined) query.set('limit', params.limit.toString());
-    if (params?.offset !== undefined) query.set('offset', params.offset.toString());
-
-    const qs = query.toString();
-    const endpoint = `/astronauts${qs ? `?${qs}` : ''}`;
-
-    try {
-      return await this.request<AstronautListResponse>(endpoint);
-    } catch (err: any) {
-      if (err.statusCode === 0 && this.demoModeEnabled) {
-        return this.getDemoAstronauts(params);
+    return this.getJson<AstronautListResponse>(url.toString(), () => {
+      let filtered = [...DEMO_ASTRONAUTS];
+      if (params?.mission_name) {
+        const query = params.mission_name.toLowerCase();
+        filtered = filtered.filter((a) => a.mission_name.toLowerCase().includes(query));
       }
-      throw err;
-    }
+      const offset = params?.offset || 0;
+      const limit = params?.limit || 50;
+      return {
+        data: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        offset,
+      };
+    });
   }
 
   /**
    * GET /api/v1/astronauts/{astronaut_id}
    */
   public async getAstronautById(astronautId: string): Promise<Astronaut> {
-    if (this.demoModeEnabled) {
+    const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}`;
+    return this.getJson<Astronaut>(url, () => {
       const found = DEMO_ASTRONAUTS.find((a) => a.id === astronautId);
       if (found) return found;
-      throw new ApiError(
-        `Astronaut with id '${astronautId}' was not found in demo records.`,
-        'ASTRONAUT_NOT_FOUND',
-        404
-      );
-    }
-
-    const endpoint = `/astronauts/${encodeURIComponent(astronautId)}`;
-    try {
-      return await this.request<Astronaut>(endpoint);
-    } catch (err: any) {
-      if (err.statusCode === 0 && this.demoModeEnabled) {
-        const found = DEMO_ASTRONAUTS.find((a) => a.id === astronautId);
-        if (found) return found;
-      }
-      throw err;
-    }
+      throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+        astronaut_id: astronautId,
+      });
+    });
   }
+
+  /* =========================================================================
+   * 2. MEASUREMENT TELEMETRY ENDPOINTS
+   * ========================================================================= */
 
   /**
    * GET /api/v1/astronauts/{astronaut_id}/measurements
@@ -217,31 +276,58 @@ class ApiClient {
     astronautId: string,
     params?: GetMeasurementsParams
   ): Promise<MeasurementListResponse> {
-    if (this.demoModeEnabled) {
-      return this.getDemoMeasurements(astronautId, params);
-    }
+    const url = new URL(`${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/measurements`);
+    if (params?.measurement_type) url.searchParams.set('measurement_type', params.measurement_type);
+    if (params?.context) url.searchParams.set('context', params.context);
+    if (params?.exercise_modality) url.searchParams.set('exercise_modality', params.exercise_modality);
+    if (params?.start_time) url.searchParams.set('start_time', params.start_time);
+    if (params?.end_time) url.searchParams.set('end_time', params.end_time);
+    if (params?.limit !== undefined) url.searchParams.set('limit', params.limit.toString());
+    if (params?.offset !== undefined) url.searchParams.set('offset', params.offset.toString());
 
-    const query = new URLSearchParams();
-    if (params?.measurement_type) query.set('measurement_type', params.measurement_type);
-    if (params?.context) query.set('context', params.context);
-    if (params?.exercise_modality) query.set('exercise_modality', params.exercise_modality);
-    if (params?.start_time) query.set('start_time', params.start_time);
-    if (params?.end_time) query.set('end_time', params.end_time);
-    if (params?.limit !== undefined) query.set('limit', params.limit.toString());
-    if (params?.offset !== undefined) query.set('offset', params.offset.toString());
-
-    const qs = query.toString();
-    const endpoint = `/astronauts/${encodeURIComponent(astronautId)}/measurements${qs ? `?${qs}` : ''}`;
-
-    try {
-      return await this.request<MeasurementListResponse>(endpoint);
-    } catch (err: any) {
-      if (err.statusCode === 0 && this.demoModeEnabled) {
-        return this.getDemoMeasurements(astronautId, params);
+    return this.getJson<MeasurementListResponse>(url.toString(), () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
       }
-      throw err;
-    }
+
+      let records = DEMO_MEASUREMENTS[astronautId] || [];
+
+      if (params?.measurement_type) {
+        records = records.filter((m) => m.measurement_type === params.measurement_type);
+      }
+      if (params?.context) {
+        records = records.filter((m) => m.context === params.context);
+      }
+      if (params?.exercise_modality) {
+        records = records.filter((m) => m.exercise_modality === params.exercise_modality);
+      }
+      if (params?.start_time) {
+        records = records.filter((m) => new Date(m.measured_at) >= new Date(params.start_time!));
+      }
+      if (params?.end_time) {
+        records = records.filter((m) => new Date(m.measured_at) <= new Date(params.end_time!));
+      }
+
+      const offset = params?.offset || 0;
+      const limit = params?.limit || 100;
+      const paginated = records.slice(offset, offset + limit);
+
+      return {
+        astronaut_id: astronautId,
+        data: paginated,
+        total: records.length,
+        limit,
+        offset,
+      };
+    });
   }
+
+  /* =========================================================================
+   * 3. BASELINE & OPERATIONAL ENVELOPE ENDPOINTS
+   * ========================================================================= */
 
   /**
    * GET /api/v1/astronauts/{astronaut_id}/baselines
@@ -250,35 +336,109 @@ class ApiClient {
     astronautId: string,
     context?: string
   ): Promise<BaselineListResponse> {
-    if (this.demoModeEnabled) {
-      const all = DEMO_BASELINES[astronautId] || [];
-      const filtered = context ? all.filter((b) => b.context === context) : all;
+    const url = new URL(`${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/baselines`);
+    if (context) url.searchParams.set('context', context);
+
+    return this.getJson<BaselineListResponse>(url.toString(), () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      let list = DEMO_BASELINES[astronautId] || [];
+      if (context) {
+        list = list.filter((b) => b.context === context);
+      }
+
       return {
         astronaut_id: astronautId,
-        data: filtered,
-        total: filtered.length,
+        data: list,
+        baselines: list,
+        total: list.length,
       };
-    }
+    });
+  }
 
-    const query = new URLSearchParams();
-    if (context) query.set('context', context);
-    const qs = query.toString();
-    const endpoint = `/astronauts/${encodeURIComponent(astronautId)}/baselines${qs ? `?${qs}` : ''}`;
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/baselines/active
+   */
+  public async getActiveBaselines(
+    astronautId: string,
+    params?: { baseline_type?: string; context?: string }
+  ): Promise<BaselineListResponse> {
+    const url = new URL(`${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/baselines/active`);
+    if (params?.baseline_type) url.searchParams.set('baseline_type', params.baseline_type);
+    if (params?.context) url.searchParams.set('context', params.context);
 
-    try {
-      return await this.request<BaselineListResponse>(endpoint);
-    } catch (err: any) {
-      if (err.statusCode === 0 && this.demoModeEnabled) {
-        const all = DEMO_BASELINES[astronautId] || [];
-        const filtered = context ? all.filter((b) => b.context === context) : all;
-        return {
+    return this.getJson<BaselineListResponse>(url.toString(), () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
           astronaut_id: astronautId,
-          data: filtered,
-          total: filtered.length,
-        };
+        });
       }
-      throw err;
-    }
+
+      let records = DEMO_BASELINES[astronautId] || [];
+      records = records.filter((b) => b.is_active);
+
+      if (params?.baseline_type) {
+        records = records.filter((b) => b.baseline_type === params.baseline_type);
+      }
+      if (params?.context) {
+        records = records.filter((b) => b.context === params.context);
+      }
+
+      return {
+        astronaut_id: astronautId,
+        data: records,
+        baselines: records,
+        total: records.length,
+      };
+    });
+  }
+
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/baselines/history
+   */
+  public async getBaselineHistory(
+    astronautId: string,
+    measurementType: string,
+    params?: { baseline_type?: string; context?: string }
+  ): Promise<BaselineListResponse> {
+    const url = new URL(
+      `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/baselines/history`
+    );
+    url.searchParams.set('measurement_type', measurementType);
+    if (params?.baseline_type) url.searchParams.set('baseline_type', params.baseline_type);
+    if (params?.context) url.searchParams.set('context', params.context);
+
+    return this.getJson<BaselineListResponse>(url.toString(), () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      let records = (DEMO_BASELINES[astronautId] || []).filter(
+        (b) => b.measurement_type === measurementType
+      );
+      if (params?.baseline_type) {
+        records = records.filter((b) => b.baseline_type === params.baseline_type);
+      }
+      if (params?.context) {
+        records = records.filter((b) => b.context === params.context);
+      }
+
+      return {
+        astronaut_id: astronautId,
+        data: records,
+        baselines: records,
+        total: records.length,
+      };
+    });
   }
 
   /**
@@ -290,43 +450,33 @@ class ApiClient {
     context?: string,
     exerciseModality?: string
   ): Promise<BaselineResponse> {
-    if (this.demoModeEnabled) {
-      const all = DEMO_BASELINES[astronautId] || [];
-      const found = all.find(
-        (b) =>
-          b.measurement_type === measurementType &&
-          (!context || b.context === context) &&
-          (!exerciseModality || b.exercise_modality === exerciseModality)
-      );
+    const url = new URL(
+      `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/baselines/${encodeURIComponent(measurementType)}`
+    );
+    if (context) url.searchParams.set('context', context);
+    if (exerciseModality) url.searchParams.set('exercise_modality', exerciseModality);
+
+    return this.getJson<BaselineResponse>(url.toString(), () => {
+      const list = DEMO_BASELINES[astronautId] || [];
+      const found =
+        list.find((b) => {
+          const matchType = b.measurement_type === measurementType;
+          const matchCtx = context ? b.context === context : true;
+          const matchMod = exerciseModality ? b.exercise_modality === exerciseModality : true;
+          return matchType && matchCtx && matchMod;
+        }) || list.find((b) => b.measurement_type === measurementType);
+
       if (found) return found;
       throw new ApiError(
-        `Baseline for astronaut '${astronautId}', metric '${measurementType}' not found in demo data.`,
+        404,
+        `Baseline for metric '${measurementType}' not found for astronaut '${astronautId}'.`,
         'BASELINE_NOT_FOUND',
-        404
+        {
+          astronaut_id: astronautId,
+          measurement_type: measurementType,
+        }
       );
-    }
-
-    const query = new URLSearchParams();
-    if (context) query.set('context', context);
-    if (exerciseModality) query.set('exercise_modality', exerciseModality);
-    const qs = query.toString();
-    const endpoint = `/astronauts/${encodeURIComponent(astronautId)}/baselines/${encodeURIComponent(measurementType)}${qs ? `?${qs}` : ''}`;
-
-    try {
-      return await this.request<BaselineResponse>(endpoint);
-    } catch (err: any) {
-      if (err.statusCode === 0 && this.demoModeEnabled) {
-        const all = DEMO_BASELINES[astronautId] || [];
-        const found = all.find(
-          (b) =>
-            b.measurement_type === measurementType &&
-            (!context || b.context === context) &&
-            (!exerciseModality || b.exercise_modality === exerciseModality)
-        );
-        if (found) return found;
-      }
-      throw err;
-    }
+    });
   }
 
   /**
@@ -336,88 +486,293 @@ class ApiClient {
     astronautId: string,
     payload: BaselineCalculationRequest
   ): Promise<BaselineResponse> {
-    if (this.demoModeEnabled) {
-      // Return matching demo baseline or synthetic calculated envelope
-      const all = DEMO_BASELINES[astronautId] || [];
-      const found = all.find((b) => b.measurement_type === payload.measurement_type);
-      if (found) return found;
-      throw new ApiError(
-        `Insufficient measurements to calculate demo baseline for ${payload.measurement_type}.`,
-        'INSUFFICIENT_MEASUREMENTS',
-        422
-      );
-    }
+    const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/baselines/calculate`;
 
-    const endpoint = `/astronauts/${encodeURIComponent(astronautId)}/baselines/calculate`;
-    return await this.request<BaselineResponse>(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(payload),
+    return this.postJson<BaselineResponse, BaselineCalculationRequest>(url, payload, () => {
+      const list = DEMO_BASELINES[astronautId] || [];
+      const existing = list.find((b) => b.measurement_type === payload.measurement_type);
+
+      if (existing) {
+        return {
+          ...existing,
+          context: payload.context || existing.context,
+          exercise_modality: payload.exercise_modality ?? null,
+          calculated_at: new Date().toISOString(),
+        };
+      }
+
+      const created: BaselineResponse = {
+        id: `base-${astronautId}-${payload.measurement_type}-calc`,
+        astronaut_id: astronautId,
+        measurement_type: payload.measurement_type,
+        context: payload.context || 'resting_cabin',
+        exercise_modality: payload.exercise_modality ?? null,
+        measurement_site: null,
+        measurement_method: null,
+        sensor_model: null,
+        unit: 'standard',
+        baseline_type: 'inflight',
+        maturity: 'provisional',
+        version: 1,
+        is_active: true,
+        is_finalized: false,
+        supersedes_baseline_id: null,
+        maturity_evaluated_at: new Date().toISOString(),
+        maturity_criteria_snapshot: 'Recalculated in demonstration mode',
+        envelope: {
+          median: 70.0,
+          q25: 65.0,
+          q75: 75.0,
+          iqr: 10.0,
+          robust_scale_iqr: 7.41,
+          mean: 70.0,
+          std_dev: 5.0,
+          min_value: 60.0,
+          max_value: 80.0,
+          sample_count: 30,
+          window_start: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString(),
+          window_end: new Date().toISOString(),
+          disclaimer: 'Statistical reference values only. NOT medical diagnostic thresholds or clinical flight rules.',
+        },
+        quality_summary: { nominal: 30, degraded: 0, total_evaluated: 30 },
+        algorithm_version: 'v2b-iqr',
+        is_synthetic: true,
+        calculated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+      return created;
     });
   }
 
-  /* Synthetic Demo Handlers strictly matching API schemas */
-  private getDemoAstronauts(params?: ListAstronautsParams): AstronautListResponse {
-    let filtered = [...DEMO_ASTRONAUTS];
+  /* =========================================================================
+   * 4. HEALTH TREND & FRESHNESS ENDPOINTS
+   * ========================================================================= */
 
-    if (params?.mission_name) {
-      const q = params.mission_name.toLowerCase();
-      filtered = filtered.filter((a) => a.mission_name.toLowerCase().includes(q));
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/trends
+   */
+  public async getTrends(
+    astronautId: string,
+    params?: { context?: string; lookback_hours?: number }
+  ): Promise<AstronautTrendsResponse> {
+    const url = new URL(`${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/trends`);
+    if (params?.context) url.searchParams.set('context', params.context);
+    if (params?.lookback_hours !== undefined) {
+      url.searchParams.set('lookback_hours', params.lookback_hours.toString());
     }
 
-    const offset = params?.offset || 0;
-    const limit = params?.limit || 50;
-    const paginated = filtered.slice(offset, offset + limit);
+    return this.getJson<AstronautTrendsResponse>(url.toString(), () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
 
-    return {
-      data: paginated,
-      total: filtered.length,
-      limit,
-      offset,
-    };
+      const records = DEMO_TRENDS[astronautId] || [];
+      return {
+        astronaut_id: astronautId,
+        evaluated_at: new Date().toISOString(),
+        data: records,
+        total: records.length,
+      };
+    });
   }
 
-  private getDemoMeasurements(
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/trends/freshness
+   */
+  public async getFreshness(astronautId: string): Promise<TelemetryFreshnessResponse> {
+    const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/trends/freshness`;
+
+    return this.getJson<TelemetryFreshnessResponse>(url, () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      const items = DEMO_FRESHNESS[astronautId] || [];
+      const staleCount = items.filter((i) => i.status === 'stale').length;
+      return {
+        astronaut_id: astronautId,
+        evaluated_at: new Date().toISOString(),
+        items,
+        stale_count: staleCount,
+        total_metrics: items.length,
+      };
+    });
+  }
+
+  /* =========================================================================
+   * 5. CLINICAL & OPERATIONAL ASSESSMENT ENDPOINTS
+   * ========================================================================= */
+
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/assessments/latest
+   */
+  public async getLatestAssessment(astronautId: string): Promise<AssessmentResponse | null> {
+    const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/assessments/latest`;
+
+    return this.getJson<AssessmentResponse | null>(url, () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      const assessments = DEMO_ASSESSMENTS[astronautId] || [];
+      return assessments.length > 0 ? assessments[0] : null;
+    });
+  }
+
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/assessments
+   */
+  public async getAssessments(
     astronautId: string,
-    params?: GetMeasurementsParams
-  ): MeasurementListResponse {
-    let records = DEMO_MEASUREMENTS[astronautId] || [];
+    limit: number = 20
+  ): Promise<AssessmentListResponse> {
+    const url = new URL(`${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/assessments`);
+    url.searchParams.set('limit', limit.toString());
 
-    if (params?.measurement_type) {
-      records = records.filter((m) => m.measurement_type === params.measurement_type);
-    }
+    return this.getJson<AssessmentListResponse>(url.toString(), () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
 
-    if (params?.context) {
-      records = records.filter((m) => m.context === params.context);
-    }
+      const assessments = DEMO_ASSESSMENTS[astronautId] || [];
+      return {
+        astronaut_id: astronautId,
+        data: assessments.slice(0, limit),
+        total: assessments.length,
+      };
+    });
+  }
 
-    if (params?.exercise_modality) {
-      records = records.filter((m) => m.exercise_modality === params.exercise_modality);
-    }
+  /**
+   * POST /api/v1/astronauts/{astronaut_id}/assessments/generate
+   */
+  public async generateAssessment(
+    astronautId: string,
+    payload?: AssessmentGenerationRequest
+  ): Promise<AssessmentResponse> {
+    const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/assessments/generate`;
 
-    if (params?.start_time) {
-      const start = new Date(params.start_time).getTime();
-      records = records.filter((m) => new Date(m.measured_at).getTime() >= start);
-    }
+    return this.postJson<AssessmentResponse, AssessmentGenerationRequest | undefined>(
+      url,
+      payload,
+      () => {
+        const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+        if (!astroExists) {
+          throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+            astronaut_id: astronautId,
+          });
+        }
 
-    if (params?.end_time) {
-      const end = new Date(params.end_time).getTime();
-      records = records.filter((m) => new Date(m.measured_at).getTime() <= end);
-    }
+        const template = (DEMO_ASSESSMENTS[astronautId] || [])[0];
+        if (!template) {
+          throw new ApiError(404, `No assessment template available for astronaut '${astronautId}'.`);
+        }
 
-    records.sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime());
+        const generated: AssessmentResponse = {
+          ...template,
+          id: `asm-${astronautId}-${Date.now()}`,
+          assessment_date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
 
-    const offset = params?.offset || 0;
-    const limit = params?.limit || 100;
-    const paginated = records.slice(offset, offset + limit);
+        if (!DEMO_ASSESSMENTS[astronautId]) {
+          DEMO_ASSESSMENTS[astronautId] = [];
+        }
+        DEMO_ASSESSMENTS[astronautId].unshift(generated);
+        return generated;
+      }
+    );
+  }
 
-    return {
-      astronaut_id: astronautId,
-      data: paginated,
-      total: records.length,
-      limit,
-      offset,
-    };
+  /* =========================================================================
+   * 6. HEALTH ALERTS & ACTION ENDPOINTS
+   * ========================================================================= */
+
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/alerts
+   */
+  public async getAlerts(
+    astronautId: string,
+    params?: { status?: string; severity?: string }
+  ): Promise<AlertListResponse> {
+    const url = new URL(`${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/alerts`);
+    if (params?.status) url.searchParams.set('status', params.status);
+    if (params?.severity) url.searchParams.set('severity', params.severity);
+
+    return this.getJson<AlertListResponse>(url.toString(), () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      let filtered = this.mutableDemoAlerts.filter((a) => a.astronaut_id === astronautId);
+      if (params?.status) {
+        filtered = filtered.filter((a) => a.status === params.status);
+      }
+      if (params?.severity) {
+        filtered = filtered.filter((a) => a.severity === params.severity);
+      }
+
+      return {
+        astronaut_id: astronautId,
+        data: filtered,
+        total: filtered.length,
+      };
+    });
+  }
+
+  /**
+   * POST /api/v1/alerts/{alert_id}/acknowledge
+   */
+  public async acknowledgeAlert(alertId: string, note?: string): Promise<AlertResponse> {
+    const url = `${BASE_URL}/alerts/${encodeURIComponent(alertId)}/acknowledge`;
+
+    return this.postJson<AlertResponse, { note?: string }>(url, { note }, () => {
+      const alert = this.mutableDemoAlerts.find((a) => a.id === alertId);
+      if (!alert) {
+        throw new ApiError(404, `Alert with id '${alertId}' not found.`, 'ALERT_NOT_FOUND', {
+          alert_id: alertId,
+        });
+      }
+      alert.status = 'acknowledged';
+      alert.acknowledged_at = new Date().toISOString();
+      return { ...alert };
+    });
+  }
+
+  /**
+   * POST /api/v1/alerts/{alert_id}/resolve
+   */
+  public async resolveAlert(alertId: string, note?: string): Promise<AlertResponse> {
+    const url = `${BASE_URL}/alerts/${encodeURIComponent(alertId)}/resolve`;
+
+    return this.postJson<AlertResponse, { note?: string }>(url, { note }, () => {
+      const alert = this.mutableDemoAlerts.find((a) => a.id === alertId);
+      if (!alert) {
+        throw new ApiError(404, `Alert with id '${alertId}' not found.`, 'ALERT_NOT_FOUND', {
+          alert_id: alertId,
+        });
+      }
+      alert.status = 'resolved';
+      alert.resolved_at = new Date().toISOString();
+      return { ...alert };
+    });
   }
 }
 
 export const apiClient = new ApiClient();
+export default apiClient;

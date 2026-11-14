@@ -20,6 +20,7 @@ interface LayoutProps {
   onRetryConnection: () => void;
   onToggleDemoMode: () => void;
   isDemoMode: boolean;
+  activeAlertsCount?: number;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -37,6 +38,7 @@ export const Layout: React.FC<LayoutProps> = ({
   onRetryConnection,
   onToggleDemoMode,
   isDemoMode,
+  activeAlertsCount = 0,
 }) => {
   return (
     <div className="flex min-h-screen flex-col bg-space-950 text-space-100">
@@ -57,6 +59,7 @@ export const Layout: React.FC<LayoutProps> = ({
           availableMetrics={availableMetrics}
           selectedMetric={selectedMetric}
           onSelectMetric={onSelectMetric}
+          activeAlertsCount={activeAlertsCount}
         />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 telemetry-grid">
           {children}

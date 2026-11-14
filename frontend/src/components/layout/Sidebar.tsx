@@ -7,12 +7,22 @@ import {
   Activity,
   TrendingUp,
   BookOpen,
+  Brain,
+  Bell,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { MeasurementType } from '../../types/measurement';
 import { getMetricMeta } from '../../utils/formatters';
 
-export type ActiveTab = 'dashboard' | 'roster' | 'telemetry' | 'baselines' | 'catalog' | 'anatomy';
+export type ActiveTab =
+  | 'dashboard'
+  | 'roster'
+  | 'telemetry'
+  | 'baselines'
+  | 'catalog'
+  | 'intelligence'
+  | 'alerts'
+  | 'anatomy';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -23,6 +33,7 @@ interface SidebarProps {
   availableMetrics: string[];
   selectedMetric: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
+  activeAlertsCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -34,17 +45,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   availableMetrics,
   selectedMetric,
   onSelectMetric,
+  activeAlertsCount = 0,
 }) => {
-  const navItems: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
+  const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: React.ReactNode }[] = [
     {
       id: 'dashboard',
       label: 'Mission Overview',
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     {
-      id: 'roster',
-      label: 'Astronaut Roster',
-      icon: <Users className="h-4 w-4" />,
+      id: 'intelligence',
+      label: 'Health Intelligence',
+      icon: <Brain className="h-4 w-4" />,
+    },
+    {
+      id: 'alerts',
+      label: 'Alerts Hub',
+      icon: <Bell className="h-4 w-4" />,
+      badge: activeAlertsCount > 0 ? (
+        <span className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-telemetry-rose text-space-950 animate-pulse">
+          {activeAlertsCount}
+        </span>
+      ) : undefined,
     },
     {
       id: 'telemetry',
@@ -66,6 +88,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: '3D Anatomy Map',
       icon: <Activity className="h-4 w-4" />,
     },
+    {
+      id: 'roster',
+      label: 'Astronaut Roster',
+      icon: <Users className="h-4 w-4" />,
+    },
   ];
 
   return (
@@ -73,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Primary Navigation */}
       <div>
         <h3 className="px-2 pb-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-space-400">
-          Navigation Modules
+          Navigation
         </h3>
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => {
@@ -82,28 +109,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-md font-mono text-xs transition-colors ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded font-mono text-xs transition-colors text-left ${
                   isActive
-                    ? 'bg-telemetry-cyan/15 text-telemetry-cyan border border-telemetry-cyan/40 font-semibold shadow-sm'
-                    : 'text-space-300 hover:text-space-100 hover:bg-space-800/60 border border-transparent'
+                    ? 'bg-space-800 text-telemetry-cyan font-bold border-l-2 border-telemetry-cyan shadow-hud-sm'
+                    : 'text-space-300 hover:bg-space-850 hover:text-space-100'
                 }`}
               >
                 {item.icon}
                 <span>{item.label}</span>
+                {item.badge}
               </button>
             );
           })}
         </nav>
       </div>
 
-      {/* Quick Astronaut Roster Selector */}
-      <div className="flex-1">
+      {/* Crew Selection Section */}
+      <div className="border-t border-space-700/60 pt-4">
         <div className="flex items-center justify-between px-2 pb-2">
           <h3 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-space-400">
             Crew Selection
           </h3>
-          <span className="font-mono text-[10px] text-space-500">
-            {astronauts.length} CREW
+          <span className="text-[10px] font-mono text-space-500">
+            {astronauts.length} Active
           </span>
         </div>
         <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-1">
@@ -191,6 +219,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
       </div>
+
+      {/* Protocol Notice Footer */}
+      <div className="pt-3 border-t border-space-800/80 text-[10px] font-mono text-space-500 mt-auto">
+        <div className="flex items-center justify-between">
+          <span>COSMOLOOKUP OS</span>
+          <span className="text-telemetry-emerald">v1.0-INTEL</span>
+        </div>
+        <div className="text-[9px] text-space-400 mt-0.5">
+          NASA Space Apps 2026
+        </div>
+      </div>
     </aside>
   );
 };
+export default Sidebar;

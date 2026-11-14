@@ -10,6 +10,7 @@ import {
 import { Astronaut } from '../../types/astronaut';
 import { Measurement, MeasurementType } from '../../types/measurement';
 import { BaselineResponse } from '../../types/baseline';
+import { TrendObservation } from '../../types/trend';
 import { TelemetryMetricCard } from './TelemetryMetricCard';
 import { MissionDayScrubber } from './MissionDayScrubber';
 import { TelemetryTimeSeriesChart } from '../charts/TelemetryTimeSeriesChart';
@@ -30,6 +31,8 @@ interface TelemetryStreamSectionProps {
   timeFilter: 'all' | '8h' | '24h';
   onTimeFilterChange: (filter: 'all' | '8h' | '24h') => void;
   onNavigateToBaselines?: (metric: MeasurementType) => void;
+  baselines?: BaselineResponse[];
+  trends?: TrendObservation[];
 }
 
 export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
@@ -41,6 +44,8 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
   timeFilter,
   onTimeFilterChange,
   onNavigateToBaselines,
+  baselines = [],
+  trends = [],
 }) => {
   const [showRawTable, setShowRawTable] = useState(false);
 
@@ -49,13 +54,13 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
   const [selectedModality, setSelectedModality] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Baseline overlay state
+  // Baseline state for currently selected metric and context
   const [baseline, setBaseline] = useState<BaselineResponse | null>(null);
   const [, setIsLoadingBaseline] = useState<boolean>(false);
 
-  // Fetch baseline for this metric and context if available
+  // Fetch contextual baseline for the selected metric
   useEffect(() => {
-    if (!astronaut) {
+    if (!astronaut?.id || !selectedMetric) {
       setBaseline(null);
       return;
     }
@@ -146,11 +151,12 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
     );
   }, [filteredMeasurements]);
 
+  // Extract available timestamps for scrubber
   const timestamps = useMemo(() => {
     return sortedForChart.map((m) => m.measured_at);
   }, [sortedForChart]);
 
-  // Group latest measurement for each metric
+  // Latest measurement for each metric
   const latestByMetric = useMemo(() => {
     const map: Record<string, Measurement> = {};
     measurements.forEach((m) => {
@@ -161,11 +167,31 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
     return map;
   }, [measurements]);
 
+  // Group baselines by metric
+  const baselineByMetric = useMemo(() => {
+    const map: Record<string, BaselineResponse> = {};
+    baselines.forEach((b) => {
+      if (b.is_active) {
+        map[b.measurement_type] = b;
+      }
+    });
+    return map;
+  }, [baselines]);
+
+  // Group trends by metric
+  const trendByMetric = useMemo(() => {
+    const map: Record<string, TrendObservation> = {};
+    trends.forEach((t) => {
+      map[t.measurement_type] = t;
+    });
+    return map;
+  }, [trends]);
+
   const meta = getMetricMeta(selectedMetric);
 
   return (
     <div className="space-y-6">
-      {/* Metric Cards Row - Dynamically rendered from availableMetrics */}
+      {/* Metric Cards Row - Dynamically rendered with Baseline & Trend overlays */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h4 className="font-mono text-xs font-semibold uppercase tracking-wider text-space-400">
@@ -181,6 +207,8 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
               key={key}
               measurementType={key}
               latestMeasurement={latestByMetric[key]}
+              baseline={baselineByMetric[key] || (key === 'spo2' ? baselineByMetric['blood_oxygen'] : undefined)}
+              trend={trendByMetric[key] || (key === 'spo2' ? trendByMetric['blood_oxygen'] : undefined)}
               isActive={selectedMetric === key}
               onSelect={() => onSelectMetric(key)}
             />
@@ -333,8 +361,9 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
               <thead className="bg-space-900 sticky top-0 border-b border-space-700 text-space-400 text-[11px]">
                 <tr>
                   <th className="p-2.5">TIMESTAMP (UTC)</th>
-                  <th className="p-2.5">METRIC TYPE</th>
+                  <th className="p-2.5">METRIC</th>
                   <th className="p-2.5">VALUE</th>
+                  <th className="p-2.5">UNIT</th>
                   <th className="p-2.5">QUALITY</th>
                   <th className="p-2.5">PROVENANCE</th>
                   <th className="p-2.5">SOURCE</th>
@@ -347,23 +376,18 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
                   const quality = formatDataQuality(record.data_quality);
                   const provenance = formatProvenance(record.is_synthetic);
                   return (
-                    <tr key={record.id} className="hover:bg-space-800/50">
-                      <td className="p-2.5 whitespace-nowrap text-space-400">
-                        {formatTimestamp(record.measured_at)}
-                      </td>
-                      <td className="p-2.5 font-bold text-space-200">
-                        {record.measurement_type}
-                      </td>
-                      <td className="p-2.5 font-bold text-space-100 whitespace-nowrap">
-                        {record.value} {record.unit}
-                      </td>
-                      <td className="p-2.5 whitespace-nowrap">
-                        <span className={`px-1.5 py-0.5 rounded border text-[10px] ${quality.badgeClass}`}>
+                    <tr key={record.id} className="hover:bg-space-800/40 text-space-300">
+                      <td className="p-2.5 whitespace-nowrap">{formatTimestamp(record.measured_at)}</td>
+                      <td className="p-2.5 whitespace-nowrap">{record.measurement_type}</td>
+                      <td className="p-2.5 font-bold text-space-100">{record.value}</td>
+                      <td className="p-2.5 text-space-400">{record.unit}</td>
+                      <td className="p-2.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${quality.badgeClass}`}>
                           {quality.label}
                         </span>
                       </td>
-                      <td className="p-2.5 whitespace-nowrap">
-                        <span className={`px-1.5 py-0.5 rounded border text-[10px] ${provenance.badgeClass}`}>
+                      <td className="p-2.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${provenance.badgeClass}`}>
                           {provenance.shortLabel}
                         </span>
                       </td>
@@ -387,3 +411,4 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
     </div>
   );
 };
+export default TelemetryStreamSection;

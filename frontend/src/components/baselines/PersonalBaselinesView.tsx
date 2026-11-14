@@ -661,7 +661,7 @@ export const PersonalBaselinesView: React.FC<PersonalBaselinesViewProps> = ({
                   <div className="text-[11px] text-space-400 space-y-1 pt-1">
                     <div>Window Start: <span className="text-space-200">{formatTimestamp(activeBaseline.envelope.window_start || '')}</span></div>
                     <div>Window End: <span className="text-space-200">{formatTimestamp(activeBaseline.envelope.window_end || '')}</span></div>
-                    <div>Calculated At: <span className="text-space-200">{formatTimestamp(activeBaseline.calculated_at)}</span></div>
+                    <div>Calculated At: <span className="text-space-200">{formatTimestamp(activeBaseline.calculated_at || activeBaseline.created_at || '')}</span></div>
                   </div>
                 </div>
               )}
