@@ -11,6 +11,7 @@ import {
   Zap,
   Brain,
   Bell,
+  Radio,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { MeasurementType } from '../../types/measurement';
@@ -26,6 +27,7 @@ interface SidebarProps {
   selectedMetric: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   activeAlertsCount?: number;
+  onOpenNonAnatomical?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -37,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   selectedMetric,
   onSelectMetric,
   activeAlertsCount = 0,
+  onOpenNonAnatomical,
 }) => {
   const navItems: {
     id: ActiveTab;
@@ -109,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-full lg:w-64 shrink-0 border-r border-space-700/80 bg-space-900/60 p-3 lg:p-4 flex flex-col gap-5 overflow-y-auto">
+    <aside className="w-full lg:w-64 shrink-0 border-r border-space-700/80 bg-space-900/60 p-3 lg:p-4 flex flex-col gap-4 overflow-y-auto">
       {/* Primary Navigation */}
       <div>
         <h3 className="px-2 pb-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-space-400">
@@ -122,7 +125,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-md font-mono text-xs transition-colors w-full ${
+                aria-label={`Navigate to ${item.label}`}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md font-mono text-xs transition-colors w-full text-left ${
                   isActive
                     ? 'bg-telemetry-cyan/15 text-telemetry-cyan border border-telemetry-cyan/40 font-semibold shadow-sm'
                     : 'text-space-300 hover:text-space-100 hover:bg-space-800/60 border border-transparent'
@@ -147,13 +151,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {astronauts.length} Active
           </span>
         </div>
-        <div className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-1 max-h-52 overflow-y-auto pr-1">
           {astronauts.map((astro) => {
             const isSelected = selectedAstronautId === astro.id;
             return (
               <button
                 key={astro.id}
                 onClick={() => onSelectAstronaut(astro.id)}
+                aria-label={`Select astronaut ${astro.name}`}
                 className={`flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs font-mono transition-colors ${
                   isSelected
                     ? 'bg-space-800 text-telemetry-cyan border border-telemetry-cyan/30'
@@ -173,6 +178,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
+      {/* Non-Anatomical Channels Trigger */}
+      {onOpenNonAnatomical && (
+        <div className="pt-2 border-t border-space-800">
+          <button
+            onClick={onOpenNonAnatomical}
+            aria-label="Open Non-Anatomical Habitat Telemetry"
+            className="w-full flex items-center justify-between px-2.5 py-2 rounded bg-purple-950/30 hover:bg-purple-900/40 border border-purple-500/30 text-xs font-mono text-purple-200 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Radio className="h-3.5 w-3.5 text-purple-400" />
+              <span>Habitat &amp; Radiation</span>
+            </div>
+            <span className="text-[9px] font-mono uppercase bg-purple-900/50 px-1.5 py-0.2 rounded border border-purple-500/40">
+              ECLSS
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Metric Quick-Switcher (Only for Telemetry & Anatomy) */}
       {(activeTab === 'telemetry' || activeTab === 'anatomy') && (
         <div className="pt-2 border-t border-space-800">
@@ -186,6 +210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={m.id}
                   onClick={() => onSelectMetric(m.id)}
+                  aria-label={`Select metric ${m.label}`}
                   className={`flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-mono transition-colors ${
                     isSelected
                       ? 'bg-space-800 text-space-100 border border-telemetry-cyan/50 font-semibold'
@@ -205,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Protocol Notice Footer */}
-      <div className="pt-3 border-t border-space-800/80 text-[10px] font-mono text-space-500">
+      <div className="pt-2 border-t border-space-800/80 text-[10px] font-mono text-space-500">
         <div className="flex items-center justify-between">
           <span>COSMOLOOKUP OS</span>
           <span className="text-telemetry-emerald">v1.0-INTEL</span>

@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Orbit, Activity, Radio, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Orbit, Activity, Radio, ShieldCheck, HelpCircle, Sparkles } from 'lucide-react';
 import { ConnectionState } from '../../types/api';
 
 interface HeaderProps {
   connectionState: ConnectionState;
   onOpenProvenanceGuide: () => void;
+  onToggleDemoGuide?: () => void;
+  isDemoGuideOpen?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   connectionState,
   onOpenProvenanceGuide,
+  onToggleDemoGuide,
+  isDemoGuideOpen = false,
 }) => {
   const [utcTime, setUtcTime] = useState<string>('');
 
@@ -57,14 +61,32 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Controls & Connection State */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Judge Demo Walkthrough Guide Button */}
+          {onToggleDemoGuide && (
+            <button
+              onClick={onToggleDemoGuide}
+              aria-label="Toggle Judge Demonstration Flow"
+              className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold transition-all ${
+                isDemoGuideOpen
+                  ? 'bg-telemetry-cyan text-space-950 shadow-hud-glow'
+                  : 'bg-space-800 hover:bg-space-750 text-telemetry-cyan border border-telemetry-cyan/40'
+              }`}
+              title="Launch the 10-step guided demonstration sequence for judges"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Demo Tour</span>
+            </button>
+          )}
+
           {/* Data Provenance Button */}
           <button
             onClick={onOpenProvenanceGuide}
+            aria-label="Inspect Data Provenance & Scientific Integrity Standard"
             className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-850 hover:bg-space-800 border border-space-700 text-xs font-mono text-space-300 hover:text-space-100 transition-colors"
             title="Inspect Data Provenance & Scientific Integrity Standard"
           >
             <ShieldCheck className="h-3.5 w-3.5 text-telemetry-cyan" />
-            <span className="hidden sm:inline">Data Provenance</span>
+            <span className="hidden sm:inline">Provenance</span>
             <HelpCircle className="h-3 w-3 text-space-500" />
           </button>
 
@@ -75,7 +97,10 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="font-semibold">API CONNECTED</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono" title="Operating with synthetic demonstration telemetry according to API Contract v1.0">
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono"
+              title="Operating with synthetic demonstration telemetry according to API Contract v1.0"
+            >
               <Activity className="h-3.5 w-3.5 text-amber-400" />
               <span>OFFLINE DEMO MODE</span>
             </div>
