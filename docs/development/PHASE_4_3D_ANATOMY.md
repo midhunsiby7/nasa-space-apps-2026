@@ -92,3 +92,9 @@ AnatomyViewport
 ### Backend Regression Verification
 - Ran complete test suite: `backend/.venv/Scripts/python -m pytest backend/tests`
 - Result: **85 passed, 1 warning** (100% green in 1.55s). Zero backend regressions.
+
+### PR #10 Integration & Navigation Hooks
+- **Baseline Envelope Navigation**: RegionTelemetryInspector incorporates direct navigation buttons (onNavigateToBaselines) enabling operators to pivot directly from regional telemetry cards to the astronaut's active baseline calculation and envelope inspector.
+- **Measurement Catalog Navigation**: Connected onNavigateToCatalog to link directly to canonical NASA physiological definitions and sanity bounds.
+- **End-to-End Integration Suite**: Validated via 
+pm run test:integration (42/42 assertions passing across isolated backend test database with clean lifecycle teardown).
