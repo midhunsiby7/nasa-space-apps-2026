@@ -3,7 +3,19 @@
  */
 export type DataQuality = 'nominal' | 'degraded' | 'noisy' | 'interpolated' | 'calibrating';
 
-export type MeasurementType = 'heart_rate' | 'blood_oxygen' | 'core_temperature' | 'radiation_dose' | string;
+export type MeasurementType =
+  | 'heart_rate'
+  | 'spo2'
+  | 'body_temperature'
+  | 'core_temperature'
+  | 'respiratory_rate'
+  | 'blood_pressure_systolic'
+  | 'blood_pressure_diastolic'
+  | 'mean_arterial_pressure'
+  | 'sleep_duration'
+  | 'radiation_dose'
+  | 'blood_oxygen'
+  | string;
 
 export interface Measurement {
   id: string;
@@ -16,6 +28,11 @@ export interface Measurement {
   context: string | null;
   data_quality: DataQuality;
   is_synthetic: boolean;
+  exercise_modality?: string | null;
+  measurement_site?: string | null;
+  measurement_method?: string | null;
+  sensor_model?: string | null;
+  mission_day?: number | null;
 }
 
 export interface MeasurementListResponse {
