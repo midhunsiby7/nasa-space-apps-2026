@@ -14,21 +14,21 @@ import { ConnectionState } from '../../types/api';
 interface HeaderProps {
   connectionState: ConnectionState;
   onOpenProvenanceGuide: () => void;
-  onToggleDemoGuide?: () => void;
-  isDemoGuideOpen?: boolean;
   onRetryConnection?: () => void;
   onToggleDemoMode?: () => void;
   isDemoMode?: boolean;
+  onToggleDemoGuide?: () => void;
+  isDemoGuideOpen?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   connectionState,
   onOpenProvenanceGuide,
-  onToggleDemoGuide,
-  isDemoGuideOpen = false,
   onRetryConnection,
   onToggleDemoMode,
   isDemoMode = false,
+  onToggleDemoGuide,
+  isDemoGuideOpen = false,
 }) => {
   const [utcTime, setUtcTime] = useState<string>('');
 

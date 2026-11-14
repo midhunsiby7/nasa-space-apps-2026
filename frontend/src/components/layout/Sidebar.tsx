@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  LayoutDashboard,
   Users,
   LineChart,
   UserCheck,
@@ -19,11 +18,11 @@ export type ActiveTab =
   | 'dashboard'
   | 'roster'
   | 'telemetry'
+  | 'anatomy'
   | 'baselines'
   | 'catalog'
   | 'intelligence'
-  | 'alerts'
-  | 'anatomy';
+  | 'alerts';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -54,56 +53,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'dashboard',
       label: 'Mission Overview',
-      icon: <LayoutDashboard className="h-4 w-4" />,
-    },
-    {
-      id: 'intelligence',
-      label: 'Health Intelligence',
-      icon: <Brain className="h-4 w-4" />,
-    },
-    {
-      id: 'alerts',
-      label: 'Alerts Hub',
-      icon: <Bell className="h-4 w-4" />,
-      badge: activeAlertsCount > 0 ? (
-        <span className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-telemetry-rose text-space-950 animate-pulse">
-          {activeAlertsCount}
-        </span>
-      ) : undefined,
-    },
-    {
-      id: 'telemetry',
-      label: 'Telemetry Explorer',
-      icon: <LineChart className="h-4 w-4" />,
-    },
-    {
-      id: 'baselines',
-      label: 'Personal Baselines',
-      icon: <TrendingUp className="h-4 w-4" />,
-    },
-    {
-      id: 'catalog',
-      label: 'Measurement Catalog',
-      icon: <BookOpen className="h-4 w-4" />,
-    },
-    {
-      id: 'anatomy',
-      label: '3D Anatomy Map',
       icon: <Activity className="h-4 w-4" />,
     },
     {
       id: 'roster',
-      label: 'Astronaut Roster',
+      label: 'Crew Directory',
       icon: <Users className="h-4 w-4" />,
+    },
+    {
+      id: 'telemetry',
+      label: 'Telemetry Stream',
+      icon: <LineChart className="h-4 w-4" />,
+    },
+    {
+      id: 'anatomy',
+      label: '3D Anatomy Map',
+      icon: <Activity className="h-4 w-4 text-telemetry-cyan" />,
+      badge: (
+        <span className="rounded bg-telemetry-cyan/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-telemetry-cyan border border-telemetry-cyan/40">
+          3D
+        </span>
+      ),
+    },
+    {
+      id: 'baselines',
+      label: 'Personal Baselines',
+      icon: <TrendingUp className="h-4 w-4 text-emerald-400" />,
+      badge: (
+        <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-emerald-400 border border-emerald-500/30">
+          IQR
+        </span>
+      ),
+    },
+    {
+      id: 'catalog',
+      label: 'Measurement Catalog',
+      icon: <BookOpen className="h-4 w-4 text-sky-400" />,
+      badge: (
+        <span className="rounded bg-sky-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-sky-400 border border-sky-500/30">
+          10
+        </span>
+      ),
+    },
+    {
+      id: 'intelligence',
+      label: 'Health Intelligence',
+      icon: <Brain className="h-4 w-4 text-purple-400" />,
+      badge: (
+        <span className="rounded bg-purple-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-purple-400 border border-purple-500/30">
+          AI
+        </span>
+      ),
+    },
+    {
+      id: 'alerts',
+      label: 'Operational Alerts',
+      icon: <Bell className="h-4 w-4" />,
+      badge:
+        activeAlertsCount > 0 ? (
+          <span className="rounded bg-rose-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-rose-400 border border-rose-500/40 animate-pulse">
+            {activeAlertsCount}
+          </span>
+        ) : undefined,
     },
   ];
 
   return (
-    <aside className="w-full lg:w-64 shrink-0 border-r border-space-700/80 bg-space-900/60 p-3 lg:p-4 flex flex-col gap-4 overflow-y-auto">
-      {/* Primary Navigation */}
+    <aside className="w-full lg:w-64 shrink-0 border-r border-space-700/80 bg-space-900/60 p-3 lg:p-4 flex flex-col gap-5 overflow-y-auto">
+      {/* Primary Navigation Tabs */}
       <div>
         <h3 className="px-2 pb-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-space-400">
-          Navigation
+          Operational Views
         </h3>
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => {
@@ -120,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
               >
                 {item.icon}
-                <span>{item.label}</span>
+                <span className="flex-1 truncate">{item.label}</span>
                 {item.badge}
               </button>
             );
@@ -128,11 +148,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Crew Selection Section */}
+      {/* Crew Quick-Selector */}
       <div className="border-t border-space-700/60 pt-4">
         <div className="flex items-center justify-between px-2 pb-2">
           <h3 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-space-400">
-            Crew Selection
+            Crew Monitored
           </h3>
           <span className="text-[10px] font-mono text-space-500">
             {astronauts.length} Active
@@ -166,8 +186,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               );
             })
           ) : (
-            <div className="p-3 text-center text-xs font-mono text-space-500 border border-dashed border-space-800 rounded">
-              No crew available
+            <div className="p-2 text-center text-xs font-mono text-space-500">
+              No crew loaded
             </div>
           )}
         </div>
@@ -255,5 +275,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
-
 export default Sidebar;

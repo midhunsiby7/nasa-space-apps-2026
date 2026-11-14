@@ -142,7 +142,7 @@ class ApiClient {
    * Write actions never silently succeed when the backend is unreachable.
    */
   private async postJson<T, P>(url: string, payload: P, fallbackFn?: () => T): Promise<T> {
-    if (this.isDemoMode()) {
+    if (this.connectionState === 'offline_demo' || this.isDemoMode()) {
       if (fallbackFn) {
         return fallbackFn();
       }
