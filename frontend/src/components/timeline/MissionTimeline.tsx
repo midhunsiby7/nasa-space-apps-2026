@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { apiClient } from '../../services/apiClient';
 import {
   Calendar,
   Clock,
@@ -55,6 +56,25 @@ export const MissionTimeline: React.FC<MissionTimelineProps> = ({
 }) => {
   const [typeFilter, setTypeFilter] = useState<'all' | TimelineEventType>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [historicalAssessments, setHistoricalAssessments] = useState<AssessmentResponse[]>([]);
+
+  // Genuinely retrieve historical assessments for this astronaut
+  useEffect(() => {
+    if (!astronaut) return;
+    let isMounted = true;
+    apiClient.getAssessments(astronaut.id, 50)
+      .then((res) => {
+        if (isMounted && res.data) {
+          setHistoricalAssessments(res.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load historical assessments for timeline:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [astronaut?.id, assessment]);
 
   // Synthesize events into a unified chronological stream
   const timelineEvents: TimelineEvent[] = useMemo(() => {
@@ -106,26 +126,30 @@ export const MissionTimeline: React.FC<MissionTimelineProps> = ({
       });
     });
 
-    // 4. Health Assessments
-    if (assessment) {
+    // 4. Health Assessments (All Historical Records)
+    const assessmentsToDisplay = historicalAssessments.length > 0
+      ? historicalAssessments
+      : (assessment ? [assessment] : []);
+
+    assessmentsToDisplay.forEach((asm) => {
       list.push({
-        id: `tl-a-${assessment.id}`,
+        id: `tl-a-${asm.id}`,
         type: 'assessment',
-        title: `Explainable Assessment: ${assessment.overall_classification.toUpperCase()}`,
-        description: assessment.summary_explanation,
-        occurrenceTime: assessment.assessment_date,
-        ingestionTime: assessment.created_at,
+        title: `Explainable Assessment: ${asm.overall_classification.toUpperCase()}`,
+        description: asm.summary_explanation,
+        occurrenceTime: asm.assessment_date,
+        ingestionTime: asm.created_at,
         severity:
-          assessment.overall_classification === 'emergency'
+          asm.overall_classification === 'emergency'
             ? 'critical'
-            : assessment.overall_classification === 'medical_review_recommended'
+            : asm.overall_classification === 'medical_review_recommended'
             ? 'high'
-            : assessment.overall_classification === 'needs_attention'
+            : asm.overall_classification === 'needs_attention'
             ? 'medium'
             : 'nominal',
-        metadata: { classification: assessment.overall_classification },
+        metadata: { classification: asm.overall_classification },
       });
-    }
+    });
 
     // 5. Operational Alerts (emissions, acknowledgements, resolutions)
     alerts.forEach((alt) => {
@@ -177,7 +201,7 @@ export const MissionTimeline: React.FC<MissionTimelineProps> = ({
     return list.sort(
       (a, b) => new Date(b.occurrenceTime).getTime() - new Date(a.occurrenceTime).getTime()
     );
-  }, [measurements, baselines, trends, assessment, alerts]);
+  }, [measurements, baselines, trends, assessment, alerts, historicalAssessments]);
 
   // Filter events
   const filteredEvents = timelineEvents.filter((ev) => {

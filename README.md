@@ -7,7 +7,7 @@
 [![React 18+](https://img.shields.io/badge/Frontend-React%2018%20%7C%20TypeScript-61DAFB.svg)](https://react.dev/)
 [![Three.js](https://img.shields.io/badge/3D%20Canvas-Three.js%20%7C%20R3F-black.svg)](https://threejs.org/)
 [![Backend Tests](https://img.shields.io/badge/Pytest-103%20Passed-brightgreen.svg)]()
-[![Integration Tests](https://img.shields.io/badge/Integration%20Suite-42%20Passed-brightgreen.svg)]()
+[![Integration Tests](https://img.shields.io/badge/Integration%20Suite-50%20Passed-brightgreen.svg)]()
 
 > **COSMOLOOKUP** is a spaceflight physiological observation, intra-individual baseline modeling, and explainable clinical decision-support platform built for the **NASA Space Apps Challenge 2026**. Designed for flight surgeons, biomedical engineers, and mission operators, COSMOLOOKUP transforms complex astronaut telemetry into transparent, actionable health intelligence for deep-space exploration.
 

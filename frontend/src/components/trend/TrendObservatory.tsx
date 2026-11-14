@@ -121,6 +121,8 @@ export const TrendObservatory: React.FC<TrendObservatoryProps> = ({
               <option value="all">All Contexts</option>
               <option value="resting_cabin">Resting Cabin</option>
               <option value="exercise_active">Exercise Active</option>
+              <option value="exercise_recovery">Exercise Recovery</option>
+              <option value="sleep_cycle">Sleep Cycle</option>
             </select>
 
             {/* Direction Filter */}

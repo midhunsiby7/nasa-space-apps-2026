@@ -254,4 +254,4 @@ COSMOLOOKUP follows a decoupled three-tier architecture:
    - `backend/.venv/Scripts/python -m pytest backend/tests` (103 tests)
    - `cd frontend && npm run lint` (`tsc --noEmit`)
    - `cd frontend && npm run build` (`vite build`)
-   - `node frontend/scripts/test-integration.mjs` (42 integration tests)
+   - `node frontend/scripts/test-integration.mjs` (50 integration tests)
