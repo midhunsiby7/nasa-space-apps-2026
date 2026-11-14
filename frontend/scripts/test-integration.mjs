@@ -6,7 +6,7 @@
  * an isolated live FastAPI Backend.
  */
 
-import { spawn, execSync } from 'child_process';
+import { spawn, spawnSync, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -20,10 +20,22 @@ const TEST_DB_FILE = path.resolve(BACKEND_DIR, 'test_cosmolookup_isolated.db');
 const TEST_DB_URL = 'sqlite:///./test_cosmolookup_isolated.db';
 
 const PYTHON_BIN = (() => {
-  const winVenv = path.join(BACKEND_DIR, '.venv', 'Scripts', 'python.exe');
-  if (fs.existsSync(winVenv)) return winVenv;
-  const nixVenv = path.join(BACKEND_DIR, '.venv', 'bin', 'python');
-  if (fs.existsSync(nixVenv)) return nixVenv;
+  const candidates = [
+    path.join(BACKEND_DIR, '.venv', 'Scripts', 'python.exe'),
+    path.join(BACKEND_DIR, '.venv', 'bin', 'python'),
+    'python',
+    'python3',
+  ];
+  for (const c of candidates) {
+    if (c === 'python' || c === 'python3' || fs.existsSync(c)) {
+      try {
+        const res = spawnSync(c, ['-c', 'import sqlalchemy, fastapi'], { stdio: 'ignore' });
+        if (res.status === 0) return c;
+      } catch {
+        // continue
+      }
+    }
+  }
   return 'python';
 })();
 
