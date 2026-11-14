@@ -33,6 +33,7 @@ export const AlertsHub: React.FC<AlertsHubProps> = ({
   } | null>(null);
   const [operatorNote, setOperatorNote] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const filteredAlerts = alerts.filter((a) => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
@@ -47,6 +48,7 @@ export const AlertsHub: React.FC<AlertsHubProps> = ({
   const handleConfirmAction = async () => {
     if (!actionModal) return;
     setIsSubmitting(true);
+    setActionError(null);
     try {
       if (actionModal.type === 'acknowledge') {
         await onAcknowledgeAlert(actionModal.alert.id, operatorNote || undefined);
@@ -55,8 +57,9 @@ export const AlertsHub: React.FC<AlertsHubProps> = ({
       }
       setActionModal(null);
       setOperatorNote('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update alert state:', err);
+      setActionError(err.message || 'Operation failed: Backend connection is required to update alert status.');
     } finally {
       setIsSubmitting(false);
     }
@@ -256,6 +259,7 @@ export const AlertsHub: React.FC<AlertsHubProps> = ({
                   {alert.status === 'active' && (
                     <button
                       onClick={() => {
+                        setActionError(null);
                         setActionModal({ type: 'acknowledge', alert });
                         setOperatorNote('Acknowledged excursion; monitoring follow-up cycle.');
                       }}
@@ -268,6 +272,7 @@ export const AlertsHub: React.FC<AlertsHubProps> = ({
                   {alert.status !== 'resolved' && (
                     <button
                       onClick={() => {
+                        setActionError(null);
                         setActionModal({ type: 'resolve', alert });
                         setOperatorNote('Telemetry stabilized and returned to personal baseline envelope.');
                       }}
@@ -323,6 +328,12 @@ export const AlertsHub: React.FC<AlertsHubProps> = ({
                 : `Mark alert "${actionModal.alert.title}" as resolved.`}
             </p>
 
+            {actionError && (
+              <div className="rounded bg-rose-500/15 border border-rose-500/40 p-2.5 font-mono text-xs text-rose-300">
+                ⚠️ {actionError}
+              </div>
+            )}
+
             <div>
               <label className="block text-[11px] font-mono text-space-400 mb-1">
                 Operator Action Note (Optional)
@@ -338,7 +349,10 @@ export const AlertsHub: React.FC<AlertsHubProps> = ({
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
-                onClick={() => setActionModal(null)}
+                onClick={() => {
+                  setActionModal(null);
+                  setActionError(null);
+                }}
                 disabled={isSubmitting}
                 className="px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 text-xs font-mono text-space-300 transition-colors"
               >

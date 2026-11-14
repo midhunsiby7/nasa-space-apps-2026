@@ -127,13 +127,13 @@ export const NonAnatomicalDataDrawer: React.FC<NonAnatomicalDataDrawerProps> = (
                 {latestRad?.unit || 'mSv'}
               </span>
               <span className="ml-auto font-mono text-[10px] text-purple-300 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded">
-                ALARA Protocol Nominal
+                ALARA Reference Protocol (mSv)
               </span>
             </div>
 
             <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-space-400">
               <span>{latestRad ? formatTimestamp(latestRad.measured_at) : 'Awaiting sensor stream'}</span>
-              <span>Sensor: Habitat Dosimeter Array</span>
+              <span>Sensor: Simulated Habitat Dosimeter Array</span>
             </div>
 
             {radTrend && (
@@ -196,7 +196,7 @@ export const NonAnatomicalDataDrawer: React.FC<NonAnatomicalDataDrawerProps> = (
             </div>
 
             <p className="mt-2.5 text-[10px] font-mono text-space-400 italic">
-              Monitored in real time by Environmental Control and Life Support System (ECLSS).
+              Illustrative baseline reference parameters (nominal exploration vehicle atmospheric envelope per NASA-STD-3001, Vol 2; not live station stream).
             </p>
           </div>
 

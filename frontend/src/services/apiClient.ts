@@ -138,11 +138,18 @@ class ApiClient {
 
   /**
    * Helper to perform standardized POST requests.
-   * On an active connection, HTTP errors are thrown directly to avoid unsafe silent fallbacks.
+   * Write actions never silently succeed when the backend is unreachable.
    */
-  private async postJson<T, P>(url: string, payload: P, fallbackFn: () => T): Promise<T> {
-    if (this.isDemoMode()) {
-      return fallbackFn();
+  private async postJson<T, P>(url: string, payload: P, fallbackFn?: () => T): Promise<T> {
+    if (this.connectionState === 'offline_demo' || this.isDemoMode()) {
+      if (fallbackFn) {
+        return fallbackFn();
+      }
+      throw new ApiError(
+        503,
+        'Cannot perform write action while running in offline demo mode. Active backend connection required.',
+        'OFFLINE_WRITE_UNAVAILABLE'
+      );
     }
 
     const controller = new AbortController();
@@ -159,11 +166,15 @@ class ApiClient {
         },
         body: JSON.stringify(payload),
       });
-    } catch (networkErr: any) {
+    } catch (networkErr) {
       clearTimeout(timeoutId);
-      console.warn(`Backend network unreachable during POST to ${url}, using offline demo:`, networkErr);
+      console.warn(`Backend network unreachable during POST to ${url}:`, networkErr);
       this.setConnectionState('offline_demo');
-      return fallbackFn();
+      throw new ApiError(
+        503,
+        'Network request failed. Backend API is currently unreachable. Action was not saved.',
+        'NETWORK_UNAVAILABLE'
+      );
     }
     clearTimeout(timeoutId);
 
@@ -737,40 +748,20 @@ class ApiClient {
 
   /**
    * POST /api/v1/alerts/{alert_id}/acknowledge
+   * Strictly requires backend connection. Write actions never silently fake success offline.
    */
   public async acknowledgeAlert(alertId: string, note?: string): Promise<AlertResponse> {
     const url = `${BASE_URL}/alerts/${encodeURIComponent(alertId)}/acknowledge`;
-
-    return this.postJson<AlertResponse, { note?: string }>(url, { note }, () => {
-      const alert = this.mutableDemoAlerts.find((a) => a.id === alertId);
-      if (!alert) {
-        throw new ApiError(404, `Alert with id '${alertId}' not found.`, 'ALERT_NOT_FOUND', {
-          alert_id: alertId,
-        });
-      }
-      alert.status = 'acknowledged';
-      alert.acknowledged_at = new Date().toISOString();
-      return { ...alert };
-    });
+    return this.postJson<AlertResponse, { note?: string }>(url, { note });
   }
 
   /**
    * POST /api/v1/alerts/{alert_id}/resolve
+   * Strictly requires backend connection. Write actions never silently fake success offline.
    */
   public async resolveAlert(alertId: string, note?: string): Promise<AlertResponse> {
     const url = `${BASE_URL}/alerts/${encodeURIComponent(alertId)}/resolve`;
-
-    return this.postJson<AlertResponse, { note?: string }>(url, { note }, () => {
-      const alert = this.mutableDemoAlerts.find((a) => a.id === alertId);
-      if (!alert) {
-        throw new ApiError(404, `Alert with id '${alertId}' not found.`, 'ALERT_NOT_FOUND', {
-          alert_id: alertId,
-        });
-      }
-      alert.status = 'resolved';
-      alert.resolved_at = new Date().toISOString();
-      return { ...alert };
-    });
+    return this.postJson<AlertResponse, { note?: string }>(url, { note });
   }
 }
 

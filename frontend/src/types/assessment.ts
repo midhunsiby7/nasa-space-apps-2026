@@ -51,4 +51,5 @@ export interface AssessmentGenerationRequest {
   lookback_hours?: number;
   generate_alerts?: boolean;
   emergency_protocol_config?: Record<string, Record<string, number>> | null;
+  reported_symptoms?: string[] | null;
 }

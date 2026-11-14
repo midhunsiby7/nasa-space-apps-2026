@@ -394,10 +394,20 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
               </div>
             )}
 
-            {/* In-Canvas HUD Overlay Info */}
-            <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-space-950/80 backdrop-blur border border-space-700/60 px-2.5 py-1.5 font-mono text-[10px] text-space-300">
-              <span className="text-telemetry-cyan font-semibold">Active Sector:</span>{' '}
-              {activeRegionConfig.label}
+            {/* In-Canvas HUD Overlay Info & Scientific Guardrail */}
+            <div className="pointer-events-none absolute bottom-3 left-3 max-w-sm rounded bg-space-950/90 backdrop-blur border border-space-700/70 p-2 font-mono text-[10px] text-space-300 space-y-1">
+              <div>
+                <span className="text-telemetry-cyan font-bold">Active Sector:</span>{' '}
+                <span className="text-space-100">{activeRegionConfig.label}</span>
+              </div>
+              <p className="text-[9px] text-space-400 leading-tight">
+                Illustrative spatial navigation model — not an anatomically accurate CAD model or clinical pathology diagnostic representation.
+              </p>
+              {viewMode === '3d' && (
+                <p className="text-[9px] text-space-500 leading-tight italic">
+                  Visualizer notice: Heart pulsation (~72 bpm) and lung respiration (~14 bpm) are reference pacing animations, not live astronaut telemetry waveforms.
+                </p>
+              )}
             </div>
           </div>
         </div>

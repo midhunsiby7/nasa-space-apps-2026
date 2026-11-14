@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Calendar, Shield, ExternalLink } from 'lucide-react';
+import { User, Calendar, Shield, ExternalLink, Activity } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement } from '../../types/measurement';
 import { formatProvenance, getMetricMeta } from '../../utils/formatters';
@@ -8,12 +8,14 @@ interface SelectedAstronautBannerProps {
   astronaut: Astronaut;
   latestMeasurements: Record<string, Measurement>;
   onOpenDetails: () => void;
+  onOpenAnatomy?: () => void;
 }
 
 export const SelectedAstronautBanner: React.FC<SelectedAstronautBannerProps> = ({
   astronaut,
   latestMeasurements,
   onOpenDetails,
+  onOpenAnatomy,
 }) => {
   const measurementList = Object.values(latestMeasurements);
   const hasSynthetic = measurementList.some((m) => m.is_synthetic);
@@ -88,8 +90,21 @@ export const SelectedAstronautBanner: React.FC<SelectedAstronautBannerProps> = (
             );
           })}
 
+          {onOpenAnatomy && (
+            <button
+              onClick={onOpenAnatomy}
+              aria-label="Open 3D Anatomy Map"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs font-mono text-telemetry-cyan transition-colors"
+              title="Navigate to 3D Anatomy Map"
+            >
+              <Activity className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">3D Anatomy</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenDetails}
+            aria-label="View Astronaut Profile Specifications"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs font-mono text-space-200 transition-colors"
           >
             <Shield className="h-3.5 w-3.5 text-telemetry-cyan" />

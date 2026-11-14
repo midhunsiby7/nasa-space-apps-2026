@@ -51,6 +51,7 @@ def generate_astronaut_assessment(
         lookback_hours=payload.lookback_hours,
         generate_alerts=payload.generate_alerts,
         emergency_protocol_config=payload.emergency_protocol_config,
+        reported_symptoms=payload.reported_symptoms,
     )
 
     return format_assessment_response(assessment)

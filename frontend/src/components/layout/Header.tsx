@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Orbit, Radio, ShieldCheck, HelpCircle, RefreshCw, AlertCircle, PlayCircle } from 'lucide-react';
+import { Orbit, Radio, ShieldCheck, HelpCircle, RefreshCw, AlertCircle, PlayCircle, Sparkles } from 'lucide-react';
 import { ConnectionState } from '../../types/api';
 
 interface HeaderProps {
@@ -8,6 +8,8 @@ interface HeaderProps {
   onRetryConnection: () => void;
   onToggleDemoMode: () => void;
   isDemoMode: boolean;
+  onToggleDemoGuide?: () => void;
+  isDemoGuideOpen?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
   onRetryConnection,
   onToggleDemoMode,
   isDemoMode,
+  onToggleDemoGuide,
+  isDemoGuideOpen = false,
 }) => {
   const [utcTime, setUtcTime] = useState<string>('');
 
@@ -63,14 +67,32 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Controls & Connection State */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Data Provenance Guide Button */}
+          {/* Judge Demo Walkthrough Guide Button */}
+          {onToggleDemoGuide && (
+            <button
+              onClick={onToggleDemoGuide}
+              aria-label="Toggle Judge Demonstration Flow"
+              className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold transition-all ${
+                isDemoGuideOpen
+                  ? 'bg-telemetry-cyan text-space-950 shadow-hud-glow'
+                  : 'bg-space-800 hover:bg-space-750 text-telemetry-cyan border border-telemetry-cyan/40'
+              }`}
+              title="Launch the 10-step guided demonstration sequence for judges"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Demo Tour</span>
+            </button>
+          )}
+
+          {/* Data Provenance Button */}
           <button
             onClick={onOpenProvenanceGuide}
+            aria-label="Inspect Data Provenance & Scientific Integrity Standard"
             className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-850 hover:bg-space-800 border border-space-700 text-xs font-mono text-space-300 hover:text-space-100 transition-colors"
             title="Inspect Data Provenance & Scientific Integrity Standard"
           >
             <ShieldCheck className="h-3.5 w-3.5 text-telemetry-cyan" />
-            <span className="hidden sm:inline">Data Provenance</span>
+            <span className="hidden sm:inline">Provenance</span>
             <HelpCircle className="h-3 w-3 text-space-500" />
           </button>
 

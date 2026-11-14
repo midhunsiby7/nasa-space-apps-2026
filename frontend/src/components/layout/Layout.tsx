@@ -21,6 +21,9 @@ interface LayoutProps {
   onToggleDemoMode: () => void;
   isDemoMode: boolean;
   activeAlertsCount?: number;
+  onOpenNonAnatomical?: () => void;
+  onToggleDemoGuide?: () => void;
+  isDemoGuideOpen?: boolean;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -39,6 +42,9 @@ export const Layout: React.FC<LayoutProps> = ({
   onToggleDemoMode,
   isDemoMode,
   activeAlertsCount = 0,
+  onOpenNonAnatomical,
+  onToggleDemoGuide,
+  isDemoGuideOpen = false,
 }) => {
   return (
     <div className="flex min-h-screen flex-col bg-space-950 text-space-100">
@@ -48,6 +54,8 @@ export const Layout: React.FC<LayoutProps> = ({
         onRetryConnection={onRetryConnection}
         onToggleDemoMode={onToggleDemoMode}
         isDemoMode={isDemoMode}
+        onToggleDemoGuide={onToggleDemoGuide}
+        isDemoGuideOpen={isDemoGuideOpen}
       />
       <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
         <Sidebar
@@ -60,6 +68,7 @@ export const Layout: React.FC<LayoutProps> = ({
           selectedMetric={selectedMetric}
           onSelectMetric={onSelectMetric}
           activeAlertsCount={activeAlertsCount}
+          onOpenNonAnatomical={onOpenNonAnatomical}
         />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 telemetry-grid">
           {children}
