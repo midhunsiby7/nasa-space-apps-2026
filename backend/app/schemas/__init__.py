@@ -13,6 +13,13 @@ from app.schemas.measurement import (
     MeasurementResponse,
     MeasurementListResponse,
 )
+from app.schemas.baseline import (
+    PersonalOperationalEnvelope,
+    BaselineQualitySummary,
+    BaselineResponse,
+    BaselineListResponse,
+    BaselineCalculationRequest,
+)
 
 __all__ = [
     "ErrorDetail",
@@ -25,4 +32,9 @@ __all__ = [
     "MeasurementCreate",
     "MeasurementResponse",
     "MeasurementListResponse",
+    "PersonalOperationalEnvelope",
+    "BaselineQualitySummary",
+    "BaselineResponse",
+    "BaselineListResponse",
+    "BaselineCalculationRequest",
 ]
