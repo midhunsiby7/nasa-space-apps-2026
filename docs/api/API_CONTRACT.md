@@ -1,56 +1,91 @@
 # COSMOLOOKUP API Contract — Specification v1.0
 
-> **Status:** Agreed & Authoritative  
+> **Project:** COSMOLOOKUP (NASA Space Apps Challenge 2026)  
+> **Status:** Agreed & Authoritative (Synchronized with Phase 8 Implementation)  
 > **Base URL:** `/api/v1`  
 > **Protocol:** HTTP/1.1 or HTTP/2  
 > **Content-Type:** `application/json`  
-> **Date:** 2026-11-14  
+> **Last Updated:** 2026-11-14  
 
-This document serves as the binding contract between backend development and frontend consumption for the initial COSMOLOOKUP release. No additional endpoints or schema alterations may be introduced without mutual team consent and documentation revisions.
+This document serves as the binding contract between backend services and frontend clients for COSMOLOOKUP. All schemas derive directly from the Pydantic v2 models in `backend/app/schemas/` and the FastAPI routers in `backend/app/api/v1/endpoints/`.
 
 ---
 
-## Standard Response Standards
+## 1. Global Architectural Standards
 
-### Success Responses
-All successful responses return standard HTTP status codes (`200 OK`) and deliver JSON payloads. Collection endpoints wrap items in a `data` array alongside pagination metadata (`total`, `limit`, `offset`).
+### 1.1 Success Response Structure
+- Single-entity endpoints deliver the resource object directly with an HTTP `200 OK`.
+- Collection endpoints return an envelope containing:
+  - `astronaut_id` (when scoped to a specific crew member)
+  - `data` (an array of serialized resource models)
+  - `total` (integer total count of matching records)
+  - `limit` and `offset` (when paginated)
 
-### Error Responses
-Error responses return appropriate 4xx or 5xx status codes and a consistent JSON payload:
+### 1.2 Error Response Envelope
+Every error response returns an appropriate HTTP status code (`4xx` or `5xx`) and a consistent error envelope:
 
 ```json
 {
   "error": {
-    "code": "RESOURCE_NOT_FOUND",
-    "message": "Astronaut with id 'astro-404' was not found.",
-    "details": null
+    "code": "ASTRONAUT_NOT_FOUND",
+    "message": "Astronaut with id 'astro-999' not found.",
+    "details": {
+      "astronaut_id": "astro-999"
+    }
   }
 }
 ```
 
 Standard Status Codes:
-- `200 OK`: Successful retrieval.
-- `400 Bad Request`: Invalid query parameters or malformed request.
-- `404 Not Found`: Target resource does not exist.
-- `500 Internal Server Error`: Unhandled server exception.
+- `200 OK`: Request succeeded.
+- `400 Bad Request`: Validation failure or ineligible request (`INVALID_QUERY_PARAMETER`, `INELIGIBLE_BASELINE_CONTEXT`).
+- `404 Not Found`: Requested resource does not exist (`ASTRONAUT_NOT_FOUND`, `BASELINE_NOT_FOUND`, `ASSESSMENT_NOT_FOUND`, `ALERT_NOT_FOUND`).
+- `409 Conflict`: State conflict (`PREFLIGHT_BASELINE_FINALIZED`).
+- `422 Unprocessable Entity`: Insufficient data for computation (`INSUFFICIENT_MEASUREMENTS`).
+- `500 Internal Server Error`: Server exception (`INTERNAL_SERVER_ERROR`).
+
+### 1.3 Scientific and Safety Guarantees
+1. **Non-Diagnostic Tooling:** All health assessments, baseline calculations, and alerts are operational decision-support indicators. They do **not** constitute medical diagnoses or clinical prescriptions.
+2. **Clinical Primacy:** In `POST /api/v1/astronauts/{id}/assessments`, subjective crew symptoms (via `reported_symptoms`) take strict precedence over normal statistical vitals.
+3. **Data Provenance:** Every measurement, baseline, assessment, and alert carries an `is_synthetic` boolean flag.
 
 ---
 
-## Endpoints
+## 2. System Endpoints
 
-### 1. List Astronauts
+### 2.1 Health Check
 
-Retrieves a paginated collection of astronaut records, optionally filterable by mission name.
+Retrieves service operational readiness.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/health` (also accessible at `/health`)
+- **Status Code:** `200 OK`
+
+```json
+{
+  "status": "healthy",
+  "app": "COSMOLOOKUP",
+  "version": "v1",
+  "environment": "development"
+}
+```
+
+---
+
+## 3. Astronaut Endpoints
+
+### 3.1 List Astronauts
+
+Retrieves a paginated list of astronaut crew profiles, optionally filtered by mission name.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts`
-- **Description:** Returns a list of astronauts with their basic profile and mission assignment details.
 
 #### Query Parameters
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `mission_name` | `string` | No | `null` | Filter astronauts belonging to a specific mission (case-insensitive substring or exact match). |
+| `mission_name` | `string` | No | `null` | Filter astronauts belonging to a specific mission (case-insensitive substring match). |
 | `limit` | `integer` | No | `50` | Maximum number of records to return (min: `1`, max: `100`). |
 | `offset` | `integer` | No | `0` | Number of records to skip for pagination (min: `0`). |
 
@@ -82,36 +117,20 @@ Retrieves a paginated collection of astronaut records, optionally filterable by 
 }
 ```
 
-#### Response: `400 Bad Request`
-
-```json
-{
-  "error": {
-    "code": "INVALID_QUERY_PARAMETER",
-    "message": "Parameter 'limit' must be an integer between 1 and 100.",
-    "details": {
-      "parameter": "limit",
-      "value": "invalid_number"
-    }
-  }
-}
-```
-
 ---
 
-### 2. Get Astronaut by ID
+### 3.2 Get Astronaut by ID
 
-Retrieves detailed profile information for an individual astronaut by their unique identifier.
+Retrieves detailed profile information for an individual astronaut.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}`
-- **Description:** Returns the complete astronaut entity corresponding to the supplied `astronaut_id`.
 
 #### Path Parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `astronaut_id` | `string` | Yes | Unique identifier of the astronaut (e.g., `"astro-001"`). |
+| `astronaut_id` | `string` | Yes | Unique identifier of the astronaut (e.g. `"astro-001"`). |
 
 #### Response: `200 OK`
 
@@ -142,29 +161,90 @@ Retrieves detailed profile information for an individual astronaut by their uniq
 
 ---
 
-### 3. Get Astronaut Measurements
+## 4. Measurement & Catalog Endpoints
 
-Retrieves physiological vitals, telemetry, and environmental measurements associated with a specific astronaut.
+### 4.1 Get Measurement Catalog
+
+Retrieves the canonical catalog of physiological and environmental metrics, context taxonomies, and countermeasure modalities.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/measurements/catalog`
+
+#### Response: `200 OK`
+
+```json
+{
+  "metrics": [
+    {
+      "canonical_identifier": "heart_rate",
+      "display_name": "Heart Rate",
+      "category": "cardiovascular",
+      "standard_unit": "bpm",
+      "description": "Resting cardiac beat frequency per minute.",
+      "accepted_aliases": ["hr", "pulse", "heartrate"],
+      "applicable_contexts": ["resting_cabin", "sleep_cycle", "exercise_active", "exercise_recovery"],
+      "sensor_sanity_min": 30.0,
+      "sensor_sanity_max": 220.0,
+      "is_derived": false
+    },
+    {
+      "canonical_identifier": "spo2",
+      "display_name": "Blood Oxygen Saturation (SpO2)",
+      "category": "respiratory",
+      "standard_unit": "%",
+      "description": "Peripheral capillary functional arterial hemoglobin oxygen saturation.",
+      "accepted_aliases": ["blood_oxygen", "o2_sat", "pulse_ox"],
+      "applicable_contexts": ["resting_cabin", "sleep_cycle", "exercise_active"],
+      "sensor_sanity_min": 50.0,
+      "sensor_sanity_max": 100.0,
+      "is_derived": false
+    }
+  ],
+  "contexts": {
+    "baseline_eligible": [
+      "exercise_active",
+      "exercise_recovery",
+      "resting_cabin",
+      "sleep_cycle"
+    ],
+    "operational_tracking": [
+      "eva_operational"
+    ],
+    "excluded": [
+      "other",
+      "unknown"
+    ]
+  },
+  "exercise_modalities": [
+    "ared_resistive",
+    "cevis_aerobic",
+    "other",
+    "t2_treadmill",
+    "unknown"
+  ]
+}
+```
+
+---
+
+### 4.2 List Astronaut Measurements
+
+Retrieves time-series telemetry observations for a specific astronaut with multi-parameter filtering and query expansion.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/measurements`
-- **Description:** Fetches time-series biometric and environmental measurements recorded for the given astronaut, supporting filtering by measurement type and timestamp ranges.
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `astronaut_id` | `string` | Yes | Unique identifier of the astronaut. |
 
 #### Query Parameters
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `measurement_type` | `string` | No | `null` | Filter by metric type (e.g., `heart_rate`, `core_temperature`, `blood_oxygen`, `radiation_dose`). |
-| `start_time` | `string` (ISO 8601) | No | `null` | Filter measurements taken on or after this timestamp (e.g., `2026-11-14T00:00:00Z`). |
-| `end_time` | `string` (ISO 8601) | No | `null` | Filter measurements taken on or before this timestamp (e.g., `2026-11-14T23:59:59Z`). |
-| `limit` | `integer` | No | `100` | Maximum number of measurement records to return (min: `1`, max: `1000`). |
-| `offset` | `integer` | No | `0` | Number of records to skip for pagination (min: `0`). |
+| `measurement_type` | `string` | No | `null` | Filter by metric type (supports aliases, e.g. `blood_oxygen` $\leftrightarrow$ `spo2`). |
+| `context` | `string` | No | `null` | Filter by operational context (e.g. `resting_cabin`, `exercise_active`). |
+| `exercise_modality`| `string` | No | `null` | Filter by exercise countermeasure modality (e.g. `ared_resistive`, `cevis_aerobic`). |
+| `start_time` | `string` (ISO 8601) | No | `null` | Filter measurements on or after this timestamp. |
+| `end_time` | `string` (ISO 8601) | No | `null` | Filter measurements on or before this timestamp. |
+| `limit` | `integer` | No | `100` | Max records to return (min: `1`, max: `1000`). |
+| `offset` | `integer` | No | `0` | Number of records to skip. |
 
 #### Response: `200 OK`
 
@@ -176,90 +256,50 @@ Retrieves physiological vitals, telemetry, and environmental measurements associ
       "id": "meas-00101",
       "astronaut_id": "astro-001",
       "measurement_type": "heart_rate",
-      "value": 74.0,
+      "value": 72.0,
       "unit": "bpm",
-      "measured_at": "2026-11-14T06:30:00Z",
+      "measured_at": "2026-11-14T11:45:00Z",
       "source": "BioHarness v3 Telemetry",
-      "context": "Post-EVA recovery period",
+      "context": "resting_cabin",
       "data_quality": "nominal",
-      "is_synthetic": true
-    },
-    {
-      "id": "meas-00102",
-      "astronaut_id": "astro-001",
-      "measurement_type": "blood_oxygen",
-      "value": 98.2,
-      "unit": "%",
-      "measured_at": "2026-11-14T06:30:00Z",
-      "source": "Pulse Oximeter Optical Band",
-      "context": "Post-EVA recovery period",
-      "data_quality": "nominal",
-      "is_synthetic": true
-    },
-    {
-      "id": "meas-00103",
-      "astronaut_id": "astro-001",
-      "measurement_type": "core_temperature",
-      "value": 37.1,
-      "unit": "celsius",
-      "measured_at": "2026-11-14T06:30:00Z",
-      "source": "Ingestible Thermal Sensor",
-      "context": "Post-EVA recovery period",
-      "data_quality": "nominal",
-      "is_synthetic": false
+      "is_synthetic": true,
+      "exercise_modality": null,
+      "measurement_site": "chest",
+      "measurement_method": "ecg_lead_ii",
+      "sensor_model": "BioHarness v3",
+      "mission_day": 42
     }
   ],
-  "total": 3,
+  "total": 1,
   "limit": 100,
   "offset": 0
 }
 ```
 
-#### Response: `404 Not Found` (Astronaut does not exist)
-
-```json
-{
-  "error": {
-    "code": "ASTRONAUT_NOT_FOUND",
-    "message": "Astronaut with id 'astro-999' not found.",
-    "details": {
-      "astronaut_id": "astro-999"
-    }
-  }
-}
-```
-
-#### Response: `400 Bad Request` (Invalid query parameter or date format)
-
-```json
-{
-  "error": {
-    "code": "INVALID_QUERY_PARAMETER",
-    "message": "Parameter 'start_time' must be a valid ISO 8601 formatted timestamp.",
-    "details": {
-      "parameter": "start_time",
-      "value": "2026-99-99"
-    }
-  }
-}
-```
-
 ---
 
-### 4. Calculate or Refresh Personal Baseline
+## 5. Personal Baseline & Lifecycle Endpoints
 
-Calculates and persists an astronaut's personal baseline envelope for a given canonical metric and context using comparable historical telemetry.
+### 5.1 Calculate or Refresh Personal Baseline
+
+Calculates and persists an astronaut's intra-individual baseline envelope using non-parametric statistics.
 
 - **Method:** `POST`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/calculate`
-- **Description:** Formulates robust non-parametric (median, IQR) and secondary parametric (mean, standard deviation) operational reference values.
 
-#### Request Body: `application/json`
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `create_version` | `boolean` | No | `false` | When true, increments baseline version and archives previous active reference. |
+
+#### Request Body (`application/json`)
 
 ```json
 {
   "measurement_type": "heart_rate",
   "context": "resting_cabin",
+  "baseline_type": "inflight",
   "exercise_modality": null,
   "measurement_site": null,
   "measurement_method": null,
@@ -282,6 +322,14 @@ Calculates and persists an astronaut's personal baseline envelope for a given ca
   "measurement_method": null,
   "sensor_model": "BioHarness chest band",
   "unit": "bpm",
+  "baseline_type": "inflight",
+  "maturity": "established",
+  "version": 1,
+  "is_active": true,
+  "is_finalized": false,
+  "supersedes_baseline_id": null,
+  "maturity_evaluated_at": "2026-11-14T12:00:00Z",
+  "maturity_criteria_snapshot": "established: n=25 >= 20; span=44.0d >= 14d",
   "envelope": {
     "median": 72.0,
     "q25": 68.0,
@@ -302,21 +350,78 @@ Calculates and persists an astronaut's personal baseline envelope for a given ca
     "degraded": 2,
     "total_evaluated": 27
   },
-  "algorithm_version": "v2b-iqr",
+  "algorithm_version": "v2c-lifecycle",
   "is_synthetic": true,
   "calculated_at": "2026-11-14T12:00:00Z"
 }
 ```
 
+#### Error Responses
+- `400 Bad Request`: Context is not baseline-eligible (e.g. `eva_operational`).
+- `422 Unprocessable Entity`: Insufficient qualifying telemetry records (`INSUFFICIENT_MEASUREMENTS`).
+
 ---
 
-### 5. List Astronaut Baselines
+### 5.2 Calculate Preflight Baseline
 
-Retrieves all calculated baseline envelopes for an astronaut, with optional context filtering.
+Calculates and registers a preflight benchmark baseline with `baseline_type = 'preflight'`.
+
+- **Method:** `POST`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/preflight`
+- **Payload:** Same as `POST /api/v1/astronauts/{astronaut_id}/baselines/calculate`
+
+#### Response: `200 OK`
+Returns `BaselineResponse` with `baseline_type: "preflight"` and `is_finalized: false`.
+
+#### Response: `409 Conflict`
+Returned if preflight baseline is already finalized:
+```json
+{
+  "error": {
+    "code": "PREFLIGHT_BASELINE_FINALIZED",
+    "message": "Preflight baseline 'base-123' for metric 'heart_rate' has been finalized and is immutable.",
+    "details": {
+      "baseline_id": "base-123"
+    }
+  }
+}
+```
+
+---
+
+### 5.3 Finalize Preflight Baseline
+
+Locks an existing preflight baseline against future modifications.
+
+- **Method:** `POST`
+- **Route:** `/api/v1/baselines/{baseline_id}/finalize`
+
+#### Request Body (`application/json`)
+
+```json
+{
+  "reason": "Flight Surgeon approved baseline dataset."
+}
+```
+
+#### Response: `200 OK`
+Returns `BaselineResponse` with `is_finalized: true`.
+
+---
+
+### 5.4 Get Active Baselines
+
+Retrieves all currently active baseline references for an astronaut.
 
 - **Method:** `GET`
-- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines`
-- **Query Parameters:** `context` (optional, e.g. `resting_cabin`)
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/active`
+
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `baseline_type` | `string` | No | Filter by cohort (`preflight` or `inflight`). |
+| `context` | `string` | No | Filter by operational context. |
 
 #### Response: `200 OK`
 
@@ -329,34 +434,11 @@ Retrieves all calculated baseline envelopes for an astronaut, with optional cont
       "astronaut_id": "astro-001",
       "measurement_type": "heart_rate",
       "context": "resting_cabin",
-      "exercise_modality": null,
-      "measurement_site": null,
-      "measurement_method": null,
-      "sensor_model": "BioHarness chest band",
-      "unit": "bpm",
-      "envelope": {
-        "median": 72.0,
-        "q25": 68.0,
-        "q75": 76.0,
-        "iqr": 8.0,
-        "robust_scale_iqr": 5.9303,
-        "mean": 72.4,
-        "std_dev": 5.8992,
-        "min_value": 62.0,
-        "max_value": 82.0,
-        "sample_count": 25,
-        "window_start": "2026-10-01T08:00:00Z",
-        "window_end": "2026-11-14T08:00:00Z",
-        "disclaimer": "Statistical reference values only. NOT medical diagnostic thresholds or clinical flight rules."
-      },
-      "quality_summary": {
-        "nominal": 25,
-        "degraded": 2,
-        "total_evaluated": 27
-      },
-      "algorithm_version": "v2b-iqr",
-      "is_synthetic": true,
-      "calculated_at": "2026-11-14T12:00:00Z"
+      "baseline_type": "inflight",
+      "maturity": "established",
+      "version": 1,
+      "is_active": true,
+      "is_finalized": false
     }
   ],
   "total": 1
@@ -365,17 +447,22 @@ Retrieves all calculated baseline envelopes for an astronaut, with optional cont
 
 ---
 
-### 6. Get Baseline by Metric
+### 5.5 Get Baseline by Metric
 
-Retrieves a specific baseline envelope for an astronaut and metric identifier (supports aliases such as `blood_oxygen` mapping to `spo2`).
+Retrieves a specific baseline envelope for an astronaut and metric identifier.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/{measurement_type}`
-- **Query Parameters:** `context` (optional), `exercise_modality` (optional)
+
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `context` | `string` | No | Context partition (e.g. `resting_cabin`). |
+| `exercise_modality`| `string` | No | Exercise equipment modality if applicable. |
 
 #### Response: `200 OK`
-
-Returns the individual `BaselineResponse` JSON object matching the specification above.
+Returns `BaselineResponse`.
 
 #### Response: `404 Not Found`
 
@@ -395,86 +482,56 @@ Returns the individual `BaselineResponse` JSON object matching the specification
 
 ---
 
-### 7. Calculate Preflight Baseline
-
-Calculates and registers a preflight benchmark baseline for an astronaut. Sets `baseline_type = 'preflight'`.
-
-- **Method:** `POST`
-- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/preflight`
-- **Payload:** Same as `POST /api/v1/astronauts/{astronaut_id}/baselines/calculate`
-
-#### Response: `200 OK`
-Returns `BaselineResponse` with `baseline_type: "preflight"` and `is_finalized: false`.
-
-#### Response: `409 Conflict`
-If preflight baseline is already finalized:
-```json
-{
-  "error": {
-    "code": "PREFLIGHT_BASELINE_FINALIZED",
-    "message": "Preflight baseline 'base-123' for metric 'heart_rate' has been finalized and is immutable.",
-    "details": {
-      "baseline_id": "base-123"
-    }
-  }
-}
-```
-
----
-
-### 8. Finalize Preflight Baseline
-
-Locks an existing preflight baseline against future modifications.
-
-- **Method:** `POST`
-- **Route:** `/api/v1/baselines/{baseline_id}/finalize`
-- **Payload:**
-```json
-{
-  "reason": "Flight Surgeon approved baseline dataset."
-}
-```
-
-#### Response: `200 OK`
-Returns `BaselineResponse` with `is_finalized: true`.
-
----
-
-### 9. Get Active Baselines
-
-Retrieves all currently active baseline references for an astronaut.
-
-- **Method:** `GET`
-- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/active`
-- **Query Parameters:** `baseline_type` (optional), `context` (optional)
-
-#### Response: `200 OK`
-Returns `BaselineListResponse` containing active records.
-
----
-
-### 10. Get Baseline Version History
+### 5.6 Get Baseline Version History
 
 Retrieves historical baseline versions for auditability and evolution tracking.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/{measurement_type}/history`
-- **Query Parameters:** `baseline_type` (optional), `context` (optional)
+
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `baseline_type` | `string` | No | Cohort filter (`preflight` or `inflight`). |
+| `context` | `string` | No | Context filter. |
 
 #### Response: `200 OK`
-Returns `BaselineListResponse` in descending version order.
+Returns `BaselineListResponse` ordered in descending version sequence.
 
 ---
 
-### 11. Astronaut Telemetry Trends
+### 5.7 List All Calculated Baselines
+
+Retrieves all calculated baselines for an astronaut.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines`
+- **Query Parameters:** `context` (optional)
+
+#### Response: `200 OK`
+Returns `BaselineListResponse`.
+
+---
+
+## 6. Trend Intelligence & Freshness Endpoints
+
+### 6.1 Astronaut Telemetry Trends
 
 Retrieves intra-individual trend analysis across all monitored metrics for an astronaut.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/trends`
-- **Query Parameters:** `context` (default: `resting_cabin`), `lookback_hours` (default: `72`)
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `context` | `string` | No | `resting_cabin` | Context partition to evaluate. |
+| `lookback_hours` | `integer` | No | `72` | Sliding lookback window in hours (min: `1`, max: `720`). |
 
 #### Response: `200 OK`
+
 ```json
 {
   "astronaut_id": "astro-001",
@@ -508,20 +565,21 @@ Retrieves intra-individual trend analysis across all monitored metrics for an as
       "explanation": "Stable physiological trajectory within expected operational variation (|Z| <= 1.5, Sen's slope ~ 0.0)."
     }
   ],
-  "total": 9
+  "total": 1
 }
 ```
 
 ---
 
-### 12. Telemetry Freshness Report
+### 6.2 Telemetry Freshness Report
 
-Evaluates telemetry currency and staleness report across all monitored metrics.
+Evaluates telemetry currency and staleness across all monitored metrics.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/trends/freshness`
 
 #### Response: `200 OK`
+
 ```json
 {
   "astronaut_id": "astro-001",
@@ -543,45 +601,58 @@ Evaluates telemetry currency and staleness report across all monitored metrics.
 
 ---
 
-### 13. Single Metric Trend
+### 6.3 Single Metric Trend
 
-Evaluates trajectory, Sen's slope rate-of-change, and deviation for an individual metric.
+Evaluates trajectory, Sen's slope, and deviation for an individual metric.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/trends/{measurement_type}`
-- **Query Parameters:** `context` (default: `resting_cabin`), `exercise_modality` (optional), `lookback_hours` (default: `72`)
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `context` | `string` | No | `resting_cabin` | Context partition. |
+| `exercise_modality`| `string` | No | `null` | Exercise modality if context is exercise. |
+| `lookback_hours` | `integer` | No | `72` | Lookback window in hours (1-720). |
 
 #### Response: `200 OK`
-Returns `TrendObservation` JSON schema.
+Returns `TrendObservation`.
 
 ---
 
-### 14. Generate Explainable Health Assessment
+## 7. Explainable Health Assessment Endpoints
 
-Synthesizes multi-metric trend analysis, concordance rules, and deterministic safe guidance.
+### 7.1 Generate Explainable Health Assessment
+
+Synthesizes multi-metric trend analysis, concordance rules, and deterministic safe operational guidance.
 
 - **Method:** `POST`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/assessments`
-- **Payload:**
+
+#### Request Body (`application/json`)
+
 ```json
 {
   "context": "resting_cabin",
   "lookback_hours": 72,
   "generate_alerts": true,
-  "emergency_protocol_config": null
+  "emergency_protocol_config": null,
+  "reported_symptoms": ["headache", "dizziness"]
 }
 ```
 
-> **Note on Emergency Protocols:** Emergency threshold evaluations are **disabled by default**. If supplied, limits are evaluated as decision-support indicators and are explicitly non-diagnostic.
+> **Clinical Primacy Notice:** Subjective crew symptoms (`reported_symptoms`) take clinical precedence over normal statistical vitals. High-acuity symptoms escalate the overall classification (`emergency` or `medical_review_recommended`) regardless of normal telemetry.
 
 #### Response: `200 OK`
+
 ```json
 {
   "id": "asm-81f72a",
   "astronaut_id": "astro-001",
   "assessment_date": "2026-11-14T12:00:00Z",
-  "overall_classification": "routine",
-  "summary_explanation": "Astronaut physiological telemetry is operating within nominal personal baseline envelopes for context 'resting_cabin'. No sustained deviations or multi-parameter shifts detected across lookback window.",
+  "overall_classification": "needs_attention",
+  "summary_explanation": "Crew-reported subjective symptoms ('headache', 'dizziness') noted alongside nominal resting vitals. Clinical primacy safeguards applied.",
   "findings": [
     {
       "measurement_type": "heart_rate",
@@ -596,9 +667,9 @@ Synthesizes multi-metric trend analysis, concordance rules, and deterministic sa
   ],
   "guidance": [
     {
-      "category": "telemetry_schedule",
-      "action": "Maintain scheduled routine telemetry collection intervals.",
-      "rationale": "All monitored vitals are operating within established intra-individual baselines.",
+      "category": "clinical_consultation",
+      "action": "Schedule Flight Surgeon clinical evaluation based on crew-reported symptoms.",
+      "rationale": "Reported symptoms require clinical review under NASA-STD-3001 clinical primacy protocol.",
       "is_medical_prescription": false
     }
   ],
@@ -613,28 +684,42 @@ Synthesizes multi-metric trend analysis, concordance rules, and deterministic sa
 
 ---
 
-### 15. Get Latest Health Assessment
+### 7.2 Get Latest Health Assessment
+
+Retrieves the most recently generated explainable health assessment for an astronaut.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/assessments/latest`
 
 #### Response: `200 OK`
-Returns the most recent `AssessmentResponse`.
+Returns `AssessmentResponse`.
+
+#### Response: `404 Not Found`
+Returned when no assessments have been generated for the astronaut.
 
 ---
 
-### 16. List Historical Health Assessments
+### 7.3 List Historical Assessments
+
+Retrieves historical assessments for an astronaut.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/assessments`
-- **Query Parameters:** `limit` (default: `50`, max: `100`)
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `limit` | `integer` | No | `50` | Max assessments to return (min: `1`, max: `100`). |
 
 #### Response: `200 OK`
 Returns `AssessmentListResponse`.
 
 ---
 
-### 17. Get Single Assessment
+### 7.4 Get Assessment by ID
+
+Retrieves a single assessment by its identifier.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/assessments/{assessment_id}`
@@ -644,13 +729,24 @@ Returns `AssessmentResponse`.
 
 ---
 
-### 18. List Health Alerts
+## 8. Operational Alert Endpoints
+
+### 8.1 List Health Alerts
+
+Retrieves operational health alerts for an astronaut with optional status and severity filtering.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/astronauts/{astronaut_id}/alerts`
-- **Query Parameters:** `status` (`active`, `acknowledged`, `resolved`), `severity` (`low`, `medium`, `high`, `critical`)
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `status` | `string` | No | `null` | Filter by status (`active`, `acknowledged`, `resolved`). |
+| `severity` | `string` | No | `null` | Filter by severity (`low`, `medium`, `high`, `critical`). |
 
 #### Response: `200 OK`
+
 ```json
 {
   "astronaut_id": "astro-001",
@@ -677,7 +773,9 @@ Returns `AssessmentResponse`.
 
 ---
 
-### 19. Get Single Alert
+### 8.2 Get Alert by ID
+
+Retrieves details for a single health alert.
 
 - **Method:** `GET`
 - **Route:** `/api/v1/alerts/{alert_id}`
@@ -687,11 +785,15 @@ Returns `AlertResponse`.
 
 ---
 
-### 20. Acknowledge Alert
+### 8.3 Acknowledge Alert
+
+Records operator review of an active health alert.
 
 - **Method:** `POST`
 - **Route:** `/api/v1/alerts/{alert_id}/acknowledge`
-- **Payload:**
+
+#### Request Body (`application/json`, optional)
+
 ```json
 {
   "note": "Operator acknowledged telemetry excursion; observing next collection cycle."
@@ -699,15 +801,19 @@ Returns `AlertResponse`.
 ```
 
 #### Response: `200 OK`
-Returns updated `AlertResponse` with `status: "acknowledged"` and timestamp.
+Returns `AlertResponse` with `status: "acknowledged"` and populated `acknowledged_at`.
 
 ---
 
-### 21. Resolve Alert
+### 8.4 Resolve Alert
+
+Marks an alert as resolved.
 
 - **Method:** `POST`
 - **Route:** `/api/v1/alerts/{alert_id}/resolve`
-- **Payload:**
+
+#### Request Body (`application/json`, optional)
+
 ```json
 {
   "note": "Follow-up measurement returned to nominal envelope."
@@ -715,5 +821,4 @@ Returns updated `AlertResponse` with `status: "acknowledged"` and timestamp.
 ```
 
 #### Response: `200 OK`
-Returns updated `AlertResponse` with `status: "resolved"` and timestamp.
-
+Returns `AlertResponse` with `status: "resolved"` and populated `resolved_at`.
