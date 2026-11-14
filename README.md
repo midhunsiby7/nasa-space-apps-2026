@@ -15,6 +15,12 @@ During long-duration space exploration—from Lunar Artemis surface habitats to 
 Key features include:
 - **Astronaut Roster & Profile Directory:** Direct lookup of crew members, mission roles, and flight elapsed days.
 - **Biometric & Environmental Telemetry:** Ingestion, querying, and visualization of vital signs (heart rate, core temperature, SpO2) and habitat context (radiation exposure, operational workload).
+- **Interactive 3D Anatomy & 2D Schematic Fallback:** Three.js holographic anatomical navigation with procedural animations, region telemetry inspection, and resilient 2D SVG fallback.
+- **Intra-Individual Personal Operational Envelopes (POEs):** Non-parametric baseline calculation engine replacing population averages with astronaut-specific baselines.
+- **Longitudinal Trend Intelligence:** Sen's slope rates of change and robust Z-score deviations across sliding observation windows.
+- **Explainable Decision Support & Clinical Primacy:** Multi-tier attention classifications, transparent natural-language synthesis, non-prescriptive operational guidance, and strict clinical primacy (crew reported symptoms take precedence over normal telemetry).
+- **Dedicated Non-Anatomical Habitat Telemetry:** Separate streams for ionizing radiation (ALARA), ECLSS cabin life support, and PVT cognitive readiness.
+- **Judge Demonstration Tour Controller:** Built-in 10-step interactive walkthrough for evaluators.
 - **Dual-Source Fidelity:** Clear separation and transparency between empirical spaceflight data and algorithmic synthetic simulation data.
 - **Modular REST API:** High-speed endpoints designed around a strict, versioned API contract.
 
@@ -108,6 +114,7 @@ git checkout develop
 
 ### Documentation & Contract Reference
 Before writing code, review the core architectural contracts:
+- [docs/presentation/PHASE_7_PRESENTATION_READINESS.md](docs/presentation/PHASE_7_PRESENTATION_READINESS.md) — Operational UI/UX guide and 10-step judge demonstration script.
 - [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) — Comprehensive project status, roadmap, and design choices.
 - [docs/api/API_CONTRACT.md](docs/api/API_CONTRACT.md) — Exact specifications for all `/api/v1` routes and payloads.
 - [docs/architecture/DATABASE_SCHEMA.md](docs/architecture/DATABASE_SCHEMA.md) — Data models, relationships, types, and constraints.

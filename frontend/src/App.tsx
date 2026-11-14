@@ -10,6 +10,8 @@ import { TelemetryStreamSection } from './components/telemetry/TelemetryStreamSe
 import { HealthIntelligenceSection } from './components/intelligence/HealthIntelligenceSection';
 import { AlertsHub } from './components/alert/AlertsHub';
 import { AnatomyViewport } from './components/anatomy/AnatomyViewport';
+import { NonAnatomicalDataDrawer } from './components/anatomy/NonAnatomicalDataDrawer';
+import { JudgeDemoController } from './components/demo/JudgeDemoController';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ErrorMessage } from './components/common/ErrorMessage';
 import { Astronaut } from './types/astronaut';
@@ -49,9 +51,11 @@ export const App: React.FC = () => {
   const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connected');
 
-  // Modals
+  // Modals & Drawers
   const [profileModalAstronaut, setProfileModalAstronaut] = useState<Astronaut | null>(null);
   const [isProvenanceModalOpen, setIsProvenanceModalOpen] = useState<boolean>(false);
+  const [isNonAnatomicalOpen, setIsNonAnatomicalOpen] = useState<boolean>(false);
+  const [isDemoGuideOpen, setIsDemoGuideOpen] = useState<boolean>(false);
 
   // Subscribe to connection state changes
   useEffect(() => {
@@ -137,6 +141,7 @@ export const App: React.FC = () => {
       setAlerts((prev) => prev.map((a) => (a.id === alertId ? updated : a)));
     } catch (err) {
       console.error('Failed to acknowledge alert:', err);
+      throw err;
     }
   };
 
@@ -146,6 +151,7 @@ export const App: React.FC = () => {
       setAlerts((prev) => prev.map((a) => (a.id === alertId ? updated : a)));
     } catch (err) {
       console.error('Failed to resolve alert:', err);
+      throw err;
     }
   };
 
@@ -171,6 +177,13 @@ export const App: React.FC = () => {
       console.error('Failed to generate health assessment:', err);
     } finally {
       setIsEvaluatingAssessment(false);
+    }
+  };
+
+  // Demo walkthrough actions
+  const handleTriggerDemoAction = (action: string) => {
+    if (action === 'open_non_anatomical') {
+      setIsNonAnatomicalOpen(true);
     }
   };
 
@@ -217,8 +230,11 @@ export const App: React.FC = () => {
       selectedMetric={selectedMetric}
       onSelectMetric={setSelectedMetric}
       connectionState={connectionState}
-      onOpenProvenanceGuide={() => setIsProvenanceModalOpen(true)}
+      onOpenProvenanceGuide={() => setIsProvenanceModalOpen(false || true)}
       activeAlertsCount={activeAlertsCount}
+      onOpenNonAnatomical={() => setIsNonAnatomicalOpen(true)}
+      onToggleDemoGuide={() => setIsDemoGuideOpen((prev) => !prev)}
+      isDemoGuideOpen={isDemoGuideOpen}
     >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Selected Astronaut Status Banner */}
@@ -227,6 +243,7 @@ export const App: React.FC = () => {
             astronaut={selectedAstronaut}
             latestMeasurements={latestMeasurementsMap}
             onOpenDetails={() => setProfileModalAstronaut(selectedAstronaut)}
+            onOpenAnatomy={() => setActiveTab('anatomy')}
           />
         )}
 
@@ -254,11 +271,17 @@ export const App: React.FC = () => {
                 activeAlertsCount={activeAlertsCount}
                 staleTelemetryCount={staleCount}
                 latestAssessment={latestAssessment}
+                baselines={baselines}
+                trends={trends}
+                alerts={alerts}
+                freshness={freshness}
                 onExploreRoster={() => setActiveTab('roster')}
                 onViewTelemetry={() => setActiveTab('telemetry')}
                 onViewIntelligence={() => setActiveTab('intelligence')}
                 onViewAlerts={() => setActiveTab('alerts')}
                 onOpenAnatomy={() => setActiveTab('anatomy')}
+                onSelectAstronaut={(id) => setSelectedAstronautId(id)}
+                onSelectMetric={(m) => setSelectedMetric(m)}
               />
             )}
 
@@ -356,6 +379,31 @@ export const App: React.FC = () => {
       <ProvenanceNotice
         isOpen={isProvenanceModalOpen}
         onClose={() => setIsProvenanceModalOpen(false)}
+      />
+
+      {/* Non-Anatomical Habitat Telemetry Drawer */}
+      <NonAnatomicalDataDrawer
+        isOpen={isNonAnatomicalOpen}
+        onClose={() => setIsNonAnatomicalOpen(false)}
+        measurements={measurements}
+        trends={trends}
+        alerts={alerts}
+        onSelectMetric={(m) => setSelectedMetric(m)}
+        onNavigateToChart={(m) => {
+          setSelectedMetric(m);
+          setActiveTab('telemetry');
+        }}
+      />
+
+      {/* Judge Demonstration Flow Controller */}
+      <JudgeDemoController
+        isOpen={isDemoGuideOpen}
+        onClose={() => setIsDemoGuideOpen(false)}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+        onSelectAstronaut={(id) => setSelectedAstronautId(id)}
+        onSelectMetric={(m) => setSelectedMetric(m)}
+        onTriggerDemoAction={handleTriggerDemoAction}
+        selectedAstronautId={selectedAstronautId}
       />
     </Layout>
   );
