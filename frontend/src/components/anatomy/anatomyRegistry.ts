@@ -67,7 +67,7 @@ export const ANATOMICAL_REGIONS: Record<AnatomicalRegionId, AnatomicalRegionDefi
     cameraPosition: [0, 0.2, 3.2],
     isContinuousTelemetryAvailable: false,
     notes: 'No continuous telemetry stream available. Monitored via periodic exercise countermeasure logs and post-flight imaging.',
-    clinicalProtocolNotice: 'Absence of continuous streaming telemetry does not imply nominal bone or muscle status. Flight rules dictate daily 2.5h resistive countermeasure regimens.',
+    clinicalProtocolNotice: 'Absence of continuous streaming telemetry does not imply nominal bone or muscle status. NASA flight rules allocate 2.5 hours total daily exercise time, comprising ~60–90 min dedicated ARED resistive loading plus ~30–45 min aerobic conditioning (T2 treadmill or CEVIS bike) with setup and hygiene.',
   },
 
   ocular: {
@@ -84,7 +84,7 @@ export const ANATOMICAL_REGIONS: Record<AnatomicalRegionId, AnatomicalRegionDefi
     cameraPosition: [0, 1.48, 1.8],
     isContinuousTelemetryAvailable: false,
     notes: 'Evaluated via scheduled in-flight optical coherence tomography (OCT) and funduscopy. No continuous telemetry sensor deployed.',
-    clinicalProtocolNotice: 'No continuous streaming telemetry is assigned to ocular anatomy. Ocular health evaluations require dedicated periodic imaging flight protocols.',
+    clinicalProtocolNotice: 'No continuous streaming telemetry is assigned to ocular anatomy. In-flight SANS surveillance follows scheduled periodic diagnostic imaging protocols (e.g., illustrative 30-to-60 day cadence per Spaceflight Standard Measures; exact schedule determined by mission flight rules).',
   },
 
   neurological: {
