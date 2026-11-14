@@ -51,12 +51,9 @@ This milestone consolidates the remaining backend intelligence and clinical deci
   - `routine`: All telemetry within nominal intra-individual operational envelopes; isolated transient excursions without consecutive deviations.
   - `needs_attention`: Single sustained shift ($k \ge 3$ consecutive deviations) OR $\ge 2$ significant outliers OR stale telemetry requiring sensor check.
   - `medical_review_recommended`: Multi-parameter concordant physiological shift across related vitals (e.g. concurrent sustained heart rate and body temperature deviations).
-  - `emergency`: Strictly restricted to explicit flight protocol emergency redlines:
-    - $\text{SpO}_2 < 85\%$
-    - Resting Heart Rate $> 180\text{ bpm}$
-    - Systolic Blood Pressure $> 200\text{ mmHg}$
+  - `emergency`: Configurable and disabled by default. Evaluated ONLY when an explicit protocol configuration is provided. Unvalidated demonstration thresholds (e.g., SpO2 < 85%, resting HR > 180 bpm, SBP > 200 mmHg) are labeled as illustrative test rules and never presented as genuine medical emergency determinations.
 * **Safe Guidance Engine:**
-  Deterministic operational recommendations focusing on sensor verification, countermeasure adherence, and flight surgeon consultation. Explicitly marked with `is_medical_prescription = false`.
+  Deterministic operational recommendations focusing on sensor verification, countermeasure adherence, clinical primacy (never dismiss symptoms based on normal telemetry), and flight surgeon consultation. Explicitly marked with `is_medical_prescription = false`.
 * **Alert Deduplication & Fatigue Suppression:**
   `create_or_update_alert` verifies if an active or acknowledged alert already exists for `(astronaut_id, measurement_type)`. If so, the existing alert record is updated in-place with latest context, upgrading severity if necessary, suppressing duplicate notification spam.
 * **Alert Lifecycle:**
@@ -158,5 +155,7 @@ backend/tests/test_phase2c_2d_2e_intelligence.py ...................... [100%]
 > **DECISION-SUPPORT NOTICE & SCIENTIFIC BOUNDARIES:**
 > 1. All baseline references, trend directions, Sen's slope rates of change, and assessment tiers are **non-diagnostic statistical decision-support aids**.
 > 2. They **DO NOT** constitute automated medical diagnoses, clinical prescriptions, or binding NASA flight surgeon flight rules.
-> 3. An emergency classification is **strictly rule-based** and triggered only by explicitly approved physiological protocol limits (SpO2 < 85%, resting HR > 180 bpm, SBP > 200 mmHg).
-> 4. Telemetry staleness notifications reflect transmission currency and **do not** denote an acute physiological emergency.
+> 3. An emergency classification is **configurable and disabled by default**. It triggers only when an explicit operational protocol configuration is supplied; illustrative demo thresholds are explicitly marked as unvalidated engineering test rules and never presented as genuine medical emergency determinations.
+> 4. **Clinical Primacy:** Normal telemetry readings must never override or dismiss reported physical symptoms. Direct crew symptom reports take precedence over statistical envelopes.
+> 5. Telemetry staleness notifications reflect transmission currency and **do not** denote an acute physiological emergency.
+> 6. All synthetic records and derived baselines/assessments remain strictly identified via `is_synthetic = True`.

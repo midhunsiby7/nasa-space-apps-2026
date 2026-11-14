@@ -567,9 +567,12 @@ Synthesizes multi-metric trend analysis, concordance rules, and deterministic sa
 {
   "context": "resting_cabin",
   "lookback_hours": 72,
-  "generate_alerts": true
+  "generate_alerts": true,
+  "emergency_protocol_config": null
 }
 ```
+
+> **Note on Emergency Protocols:** Emergency threshold evaluations are **disabled by default**. If supplied, limits are evaluated as decision-support indicators and are explicitly non-diagnostic.
 
 #### Response: `200 OK`
 ```json

@@ -755,9 +755,9 @@ def test_assessment_medical_review_recommended(db_session: Session, sample_astro
 
 
 def test_assessment_emergency_redline_enforcement(db_session: Session, sample_astronaut: Astronaut):
-    """Verify emergency classification triggers ONLY when explicit protocol redline is breached."""
+    """Verify emergency classification triggers ONLY when explicit protocol configuration is supplied."""
     now = datetime.now(timezone.utc)
-    # Critical SpO2 violation (82% < 85% emergency redline)
+    # Low SpO2 reading (82%)
     db_session.add(
         _make_meas(
             id="meas-crit-spo2",
@@ -772,20 +772,36 @@ def test_assessment_emergency_redline_enforcement(db_session: Session, sample_as
     )
     db_session.commit()
 
-    assessment = synthesize_health_assessment(
+    # 1. By default, emergency thresholds are DISABLED (no fabricated emergencies)
+    assessment_default = synthesize_health_assessment(
+        db=db_session,
+        astronaut_id=sample_astronaut.id,
+        context="resting_cabin",
+        generate_alerts=False,
+        # emergency_protocol_config defaults to None
+    )
+    assert assessment_default.overall_classification != "emergency"
+    assert "OPERATIONAL PROTOCOL NOTICE" not in assessment_default.summary_explanation
+
+    # 2. When explicitly configured protocol threshold is provided, emergency rule triggers
+    protocol_cfg = {"spo2": {"critical_low": 85.0}}
+    assessment_configured = synthesize_health_assessment(
         db=db_session,
         astronaut_id=sample_astronaut.id,
         context="resting_cabin",
         generate_alerts=True,
+        emergency_protocol_config=protocol_cfg,
     )
-    assert assessment.overall_classification == "emergency"
-    assert "CRITICAL ALERT" in assessment.summary_explanation
+    assert assessment_configured.overall_classification == "emergency"
+    assert "OPERATIONAL PROTOCOL NOTICE" in assessment_configured.summary_explanation
+    assert "decision-support indicator and not an automated clinical diagnosis" in assessment_configured.summary_explanation
 
     alerts = list_alerts_for_astronaut(db_session, sample_astronaut.id)
     assert len(alerts) >= 1
     crit_alert = next((a for a in alerts if a.severity == "critical"), None)
     assert crit_alert is not None
     assert crit_alert.measurement_type == "spo2"
+    assert crit_alert.category == "operational_protocol"
 
 
 def test_assessment_safe_guidance_non_diagnostic():

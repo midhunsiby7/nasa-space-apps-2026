@@ -58,3 +58,7 @@ class AssessmentGenerationRequest(BaseModel):
     context: str = Field("resting_cabin", description="Primary physiological context partition")
     lookback_hours: int = Field(72, ge=1, le=720, description="Observation lookback window in hours (default 72h)")
     generate_alerts: bool = Field(True, description="Whether to automatically emit alerts for non-routine findings")
+    emergency_protocol_config: Optional[Dict[str, Dict[str, float]]] = Field(
+        None,
+        description="Optional explicitly configured protocol limits. Emergency evaluation is disabled by default.",
+    )

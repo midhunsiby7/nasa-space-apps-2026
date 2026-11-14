@@ -28,38 +28,62 @@ from app.services.trend_service import (
 )
 
 
-# Explicit Approved Operational Emergency Protocol Redlines
-# (Strictly enforced: Emergency classification is NEVER manufactured unless one of these explicit rules triggers)
-EMERGENCY_RULES: Dict[str, Dict[str, float]] = {
+# Illustrative Demonstration Thresholds (Unvalidated & Disabled by Default)
+# IMPORTANT: These default values are illustrative engineering artifacts for test scaffolding.
+# They are NOT authoritative or NASA-approved clinical flight protocol thresholds.
+# Emergency threshold evaluation is DISABLED BY DEFAULT in operational assessment flows.
+DEMO_UNVALIDATED_EMERGENCY_THRESHOLDS: Dict[str, Dict[str, float]] = {
     "spo2": {"critical_low": 85.0},
     "heart_rate": {"critical_high_resting": 180.0},
     "blood_pressure_systolic": {"critical_high": 200.0},
 }
 
 
-def evaluate_metric_finding(trend: TrendObservation) -> Tuple[str, AssessmentFinding]:
-    """Evaluate individual metric trend into an explainable finding and severity tier."""
+def evaluate_metric_finding(
+    trend: TrendObservation,
+    emergency_protocol_config: Optional[Dict[str, Dict[str, float]]] = None,
+) -> Tuple[str, AssessmentFinding]:
+    """Evaluate individual metric trend into an explainable finding and severity tier.
+
+    Emergency evaluation is DISABLED by default unless an explicit protocol configuration
+    is provided via `emergency_protocol_config`. Unvalidated thresholds must never be presented
+    as genuine medical emergency determinations.
+    """
     status = "nominal"
     summary = f"{trend.measurement_type}: Operating within nominal intra-individual variation."
 
-    # 1. Emergency rule check (critical physiological limits)
-    if trend.current_value is not None:
-        if trend.measurement_type == "spo2" and trend.current_value < EMERGENCY_RULES["spo2"]["critical_low"]:
+    # 1. Configured emergency rule check (DISABLED by default unless emergency_protocol_config is provided)
+    if emergency_protocol_config and trend.current_value is not None:
+        metric_cfg = emergency_protocol_config.get(trend.measurement_type, {})
+        crit_low = metric_cfg.get("critical_low")
+        crit_high = metric_cfg.get("critical_high")
+        crit_high_resting = metric_cfg.get("critical_high_resting")
+
+        if crit_low is not None and trend.current_value < crit_low:
             status = "emergency"
-            summary = f"CRITICAL: Oxygen saturation is {trend.current_value}%, violating emergency floor (85%). Immediate operational review required."
+            summary = (
+                f"OPERATIONAL PROTOCOL NOTICE: {trend.measurement_type} ({trend.current_value} {trend.unit}) "
+                f"breached configured protocol floor ({crit_low} {trend.unit}). "
+                f"This notification is a decision-support indicator based on configured protocol rules and does NOT constitute a clinical diagnosis."
+            )
         elif (
-            trend.measurement_type == "heart_rate"
+            crit_high_resting is not None
             and trend.context == "resting_cabin"
-            and trend.current_value > EMERGENCY_RULES["heart_rate"]["critical_high_resting"]
+            and trend.current_value > crit_high_resting
         ):
             status = "emergency"
-            summary = f"CRITICAL: Resting heart rate is {trend.current_value} bpm, violating emergency ceiling (180 bpm). Immediate operational review required."
-        elif (
-            trend.measurement_type == "blood_pressure_systolic"
-            and trend.current_value > EMERGENCY_RULES["blood_pressure_systolic"]["critical_high"]
-        ):
+            summary = (
+                f"OPERATIONAL PROTOCOL NOTICE: Resting {trend.measurement_type} ({trend.current_value} {trend.unit}) "
+                f"breached configured protocol ceiling ({crit_high_resting} {trend.unit}). "
+                f"This notification is a decision-support indicator based on configured protocol rules and does NOT constitute a clinical diagnosis."
+            )
+        elif crit_high is not None and trend.current_value > crit_high:
             status = "emergency"
-            summary = f"CRITICAL: Systolic blood pressure is {trend.current_value} mmHg, violating emergency ceiling (200 mmHg)."
+            summary = (
+                f"OPERATIONAL PROTOCOL NOTICE: {trend.measurement_type} ({trend.current_value} {trend.unit}) "
+                f"breached configured protocol ceiling ({crit_high} {trend.unit}). "
+                f"This notification is a decision-support indicator based on configured protocol rules and does NOT constitute a clinical diagnosis."
+            )
 
     # 2. Non-emergency status evaluation
     if status != "emergency":
@@ -113,8 +137,9 @@ def generate_safe_guidance(classification: str, findings: List[AssessmentFinding
         guidance.append(
             GuidanceItem(
                 category="emergency_protocol",
-                action="Immediately execute mission emergency medical protocol and notify the Crew Medical Officer and Flight Surgeon.",
-                rationale="Critical operational threshold reached under approved flight rules.",
+                action="Notify the Crew Medical Officer and Flight Surgeon for review of configured protocol excursion.",
+                rationale="Configured operational protocol threshold reached. Operational notice only; does not replace flight surgeon clinical evaluation.",
+                is_medical_prescription=False,
             )
         )
     elif classification == "medical_review_recommended":
@@ -175,6 +200,7 @@ def synthesize_health_assessment(
     context: str = "resting_cabin",
     lookback_hours: int = 72,
     generate_alerts: bool = True,
+    emergency_protocol_config: Optional[Dict[str, Dict[str, float]]] = None,
 ) -> HealthAssessment:
     """Execute end-to-end explainable assessment synthesizing trends, baselines, and safety rules."""
     astronaut = get_astronaut(db=db, astronaut_id=astronaut_id)
@@ -201,7 +227,7 @@ def synthesize_health_assessment(
     significant_deviations: List[str] = []
 
     for t in trends:
-        st, f = evaluate_metric_finding(t)
+        st, f = evaluate_metric_finding(t, emergency_protocol_config=emergency_protocol_config)
         findings.append(f)
         statuses.append(st)
 
@@ -220,15 +246,16 @@ def synthesize_health_assessment(
 
     # 3. Concordance & Attention Classification
     # Rules:
-    # - emergency: Explicit emergency rule triggered.
+    # - emergency: Explicitly configured protocol threshold triggered (disabled by default).
     # - medical_review_recommended: Multiple sustained shifts (e.g. HR + temp) OR 1 sustained shift + 1 significant outlier.
     # - needs_attention: 1 sustained shift OR 2+ significant outliers.
     # - routine: Nominal or isolated single outlier.
     if emergency_detected:
         overall_classification = "emergency"
         explanation = (
-            "CRITICAL ALERT: Telemetry observation met explicitly configured flight emergency criteria. "
-            "Immediate crew operational and medical intervention is indicated. This observation is rule-based and non-diagnostic."
+            f"OPERATIONAL PROTOCOL NOTICE: Telemetry excursion in {', '.join(emergency_metrics)} "
+            f"met explicitly configured threshold criteria. This notification is an operational "
+            f"decision-support indicator and not an automated clinical diagnosis."
         )
     elif len(sustained_shifts) >= 2 or (len(sustained_shifts) >= 1 and len(significant_deviations) >= 1):
         overall_classification = "medical_review_recommended"
@@ -295,7 +322,7 @@ def synthesize_health_assessment(
                 title=f"{target_metric.replace('_', ' ').title()} {overall_classification.replace('_', ' ').title()}",
                 explanation=explanation,
                 severity=severity,
-                category="physiological_shift" if overall_classification != "emergency" else "emergency_protocol",
+                category="physiological_shift" if overall_classification != "emergency" else "operational_protocol",
                 assessment_id=assessment_id,
             )
 
