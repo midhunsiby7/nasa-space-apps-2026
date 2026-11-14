@@ -6,6 +6,20 @@ export interface ApiErrorResponse {
   };
 }
 
+export class ApiError extends Error {
+  public code: string;
+  public details?: unknown;
+  public statusCode: number;
+
+  constructor(message: string, code: string, statusCode: number, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.details = details;
+  }
+}
+
 export interface ListAstronautsParams {
   mission_name?: string;
   limit?: number;
@@ -20,4 +34,11 @@ export interface GetMeasurementsParams {
   offset?: number;
 }
 
-export type ConnectionState = 'connected' | 'offline_demo' | 'connecting' | 'error';
+export interface HealthCheckResponse {
+  status: string;
+  app: string;
+  version: string;
+  environment: string;
+}
+
+export type ConnectionState = 'connected' | 'connecting' | 'offline' | 'error' | 'offline_demo';

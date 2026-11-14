@@ -10,6 +10,7 @@ import { formatTimestamp, formatDataQuality, formatProvenance } from '../../util
 interface TelemetryStreamSectionProps {
   astronaut: Astronaut | null;
   measurements: Measurement[];
+  availableMetrics: string[];
   selectedMetric: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   timeFilter: 'all' | '8h' | '24h';
@@ -19,6 +20,7 @@ interface TelemetryStreamSectionProps {
 export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
   astronaut,
   measurements,
+  availableMetrics,
   selectedMetric,
   onSelectMetric,
   timeFilter,
@@ -48,26 +50,24 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
     return filteredForChart.map((m) => m.measured_at);
   }, [filteredForChart]);
 
-  const coreMetricKeys: MeasurementType[] = [
-    'heart_rate',
-    'blood_oxygen',
-    'core_temperature',
-    'radiation_dose',
-  ];
-
   return (
     <div className="space-y-6">
-      {/* 4 Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {coreMetricKeys.map((key) => (
-          <TelemetryMetricCard
-            key={key}
-            measurementType={key}
-            latestMeasurement={latestByMetric[key]}
-            isActive={selectedMetric === key}
-            onSelect={() => onSelectMetric(key)}
-          />
-        ))}
+      {/* Metric Cards Row - Dynamically rendered from availableMetrics */}
+      <div>
+        <h4 className="font-mono text-xs font-semibold uppercase tracking-wider text-space-400 mb-3">
+          Available Biometric &amp; Telemetry Channels ({availableMetrics.length})
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          {availableMetrics.map((key) => (
+            <TelemetryMetricCard
+              key={key}
+              measurementType={key}
+              latestMeasurement={latestByMetric[key]}
+              isActive={selectedMetric === key}
+              onSelect={() => onSelectMetric(key)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Mission Timeline Context Scrubber */}
@@ -108,7 +108,7 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-mono text-xs font-semibold uppercase tracking-wider text-space-300 flex items-center gap-2">
               <Eye className="h-4 w-4 text-telemetry-emerald" />
-              Raw Telemetry Ingestion Log (Matching API Contract v1.0)
+              Raw Telemetry Records Retrieved From Backend
             </h4>
             <span className="font-mono text-[11px] text-space-400">
               {filteredForChart.length} Records In-Memory
@@ -120,7 +120,7 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
               <thead className="bg-space-900 sticky top-0 border-b border-space-700 text-space-400 text-[11px]">
                 <tr>
                   <th className="p-2.5">TIMESTAMP (UTC)</th>
-                  <th className="p-2.5">METRIC</th>
+                  <th className="p-2.5">METRIC TYPE</th>
                   <th className="p-2.5">VALUE</th>
                   <th className="p-2.5">QUALITY</th>
                   <th className="p-2.5">PROVENANCE</th>
