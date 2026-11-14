@@ -137,3 +137,40 @@ class AlertNotFoundException(AppException):
             status_code=404,
             details={"alert_id": alert_id},
         )
+
+
+class ResearchStudyNotFoundException(AppException):
+    """Raised when an OSDR research study does not exist in the catalogue."""
+
+    def __init__(self, accession: str):
+        super().__init__(
+            code="RESEARCH_STUDY_NOT_FOUND",
+            message=f"Research study with accession '{accession}' not found in catalogue.",
+            status_code=404,
+            details={"accession": accession},
+        )
+
+
+class ResearchCatalogueUnavailableException(AppException):
+    """Raised when the curated research catalogue is missing or not initialized."""
+
+    def __init__(self, message: Optional[str] = None):
+        super().__init__(
+            code="RESEARCH_CATALOGUE_UNAVAILABLE",
+            message=message or "The NASA OSDR research catalogue is currently unavailable.",
+            status_code=503,
+            details=None,
+        )
+
+
+class ResearchCatalogueCorruptException(AppException):
+    """Raised when the curated research catalogue is malformed or fails validation."""
+
+    def __init__(self, message: str, details: Optional[Any] = None):
+        super().__init__(
+            code="RESEARCH_CATALOGUE_CORRUPT",
+            message=message,
+            status_code=500,
+            details=details,
+        )
+

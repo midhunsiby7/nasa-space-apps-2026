@@ -39,6 +39,14 @@ from app.schemas.alert import (
     AlertListResponse,
     AlertActionRequest,
 )
+from app.schemas.research import (
+    EvidenceCategory,
+    ResearchRelevance,
+    ResearchStudy,
+    ResearchStudyResponse,
+    ResearchStudyListResponse,
+    ResearchSummaryResponse,
+)
 
 __all__ = [
     "ErrorDetail",
@@ -69,4 +77,10 @@ __all__ = [
     "AlertResponse",
     "AlertListResponse",
     "AlertActionRequest",
+    "EvidenceCategory",
+    "ResearchRelevance",
+    "ResearchStudy",
+    "ResearchStudyResponse",
+    "ResearchStudyListResponse",
+    "ResearchSummaryResponse",
 ]
