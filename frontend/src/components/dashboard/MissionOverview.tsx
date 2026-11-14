@@ -9,7 +9,6 @@ import {
   Heart,
   Droplet,
   Thermometer,
-  Zap,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -127,25 +126,25 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
       color: '#f43f5e',
     },
     {
-      type: 'blood_oxygen',
-      label: 'SpO2 Oxygen',
+      type: 'spo2',
+      label: 'Oxygen Saturation (SpO₂)',
       unit: '%',
       icon: <Droplet className="h-4 w-4 text-sky-400" />,
       color: '#38bdf8',
     },
     {
-      type: 'core_temperature',
-      label: 'Core Temperature',
+      type: 'body_temperature',
+      label: 'Body Temperature',
       unit: '°C',
       icon: <Thermometer className="h-4 w-4 text-amber-400" />,
       color: '#f59e0b',
     },
     {
-      type: 'radiation_dose',
-      label: 'Ionizing Radiation',
-      unit: 'mSv',
-      icon: <Zap className="h-4 w-4 text-purple-400" />,
-      color: '#c084fc',
+      type: 'blood_pressure_systolic',
+      label: 'Systolic Blood Pressure',
+      unit: 'mmHg',
+      icon: <Activity className="h-4 w-4 text-rose-400" />,
+      color: '#fb7185',
     },
   ];
 
@@ -328,26 +327,8 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
                 <Activity className="h-3.5 w-3.5" />
                 <span>3D Anatomy</span>
               </button>
-              {onOpenBaselines && (
-                <button
-                  onClick={onOpenBaselines}
-                  className="px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-telemetry-emerald/40 text-xs font-mono text-telemetry-emerald transition-colors flex items-center gap-1.5"
-                >
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  <span>Baselines</span>
-                </button>
-              )}
-              {onOpenCatalog && (
-                <button
-                  onClick={onOpenCatalog}
-                  className="px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-purple-400/40 text-xs font-mono text-purple-300 transition-colors flex items-center gap-1.5"
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span>Catalog</span>
-                </button>
-              )}
               <button
-                onClick={onExploreTelemetry}
+                onClick={onViewTelemetry || onExploreTelemetry}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 text-xs font-mono text-space-200 transition-colors"
                 title="View Full Telemetry Stream"
               >
@@ -357,20 +338,20 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
               {onOpenBaselines && (
                 <button
                   onClick={onOpenBaselines}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-emerald-500/40 text-xs font-mono text-emerald-400 transition-colors"
+                  className="px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-telemetry-emerald/40 text-xs font-mono text-telemetry-emerald transition-colors flex items-center gap-1.5"
                   title="View Personal Baselines"
                 >
-                  <TrendingUp className="h-3 w-3" />
+                  <TrendingUp className="h-3.5 w-3.5" />
                   <span>Baselines</span>
                 </button>
               )}
               {onOpenCatalog && (
                 <button
                   onClick={onOpenCatalog}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-sky-500/40 text-xs font-mono text-sky-400 transition-colors"
+                  className="px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-purple-400/40 text-xs font-mono text-purple-300 transition-colors flex items-center gap-1.5"
                   title="View Measurement Catalog"
                 >
-                  <BookOpen className="h-3 w-3" />
+                  <BookOpen className="h-3.5 w-3.5" />
                   <span>Catalog</span>
                 </button>
               )}
@@ -396,9 +377,9 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
           {/* 4 Core Physiological Telemetry Cards with Personal Baselines & Velocity */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {coreMetrics.map((metric) => {
-              const reading = latestByMetric[metric.type];
-              const baseline = baselineMap[metric.type];
-              const trend = trendMap[metric.type];
+              const reading = latestByMetric[metric.type] || (metric.type === 'spo2' ? latestByMetric['blood_oxygen'] : metric.type === 'blood_oxygen' ? latestByMetric['spo2'] : metric.type === 'body_temperature' ? latestByMetric['core_temperature'] : metric.type === 'core_temperature' ? latestByMetric['body_temperature'] : undefined);
+              const baseline = baselineMap[metric.type] || (metric.type === 'spo2' ? baselineMap['blood_oxygen'] : metric.type === 'blood_oxygen' ? baselineMap['spo2'] : metric.type === 'body_temperature' ? baselineMap['core_temperature'] : metric.type === 'core_temperature' ? baselineMap['body_temperature'] : undefined);
+              const trend = trendMap[metric.type] || (metric.type === 'spo2' ? trendMap['blood_oxygen'] : metric.type === 'blood_oxygen' ? trendMap['spo2'] : metric.type === 'body_temperature' ? trendMap['core_temperature'] : metric.type === 'core_temperature' ? trendMap['body_temperature'] : undefined);
 
               const q25 = baseline?.envelope?.q25 ?? null;
               const q75 = baseline?.envelope?.q75 ?? null;

@@ -9,6 +9,9 @@ import {
   Brain,
   Bell,
   Radio,
+  Calendar,
+  Sparkles,
+  Layers,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { MeasurementType } from '../../types/measurement';
@@ -22,7 +25,10 @@ export type ActiveTab =
   | 'baselines'
   | 'catalog'
   | 'intelligence'
-  | 'alerts';
+  | 'trends'
+  | 'alerts'
+  | 'assessments'
+  | 'timeline';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -53,22 +59,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'dashboard',
       label: 'Mission Overview',
-      icon: <Activity className="h-4 w-4" />,
+      icon: <Activity className="h-4 w-4 text-space-300" />,
     },
     {
-      id: 'roster',
-      label: 'Crew Directory',
-      icon: <Users className="h-4 w-4" />,
+      id: 'intelligence',
+      label: 'Mission Intelligence',
+      icon: <Brain className="h-4 w-4 text-purple-400" />,
+      badge: (
+        <span className="rounded bg-purple-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-purple-400 border border-purple-500/30">
+          INTEL
+        </span>
+      ),
+    },
+    {
+      id: 'trends',
+      label: 'Trend Observatory',
+      icon: <TrendingUp className="h-4 w-4 text-emerald-400" />,
+      badge: (
+        <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-emerald-400 border border-emerald-500/30">
+          24h
+        </span>
+      ),
+    },
+    {
+      id: 'alerts',
+      label: 'Alert Command Desk',
+      icon: <Bell className="h-4 w-4 text-rose-400" />,
+      badge:
+        activeAlertsCount > 0 ? (
+          <span className="rounded bg-rose-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-rose-400 border border-rose-500/40 animate-pulse">
+            {activeAlertsCount}
+          </span>
+        ) : undefined,
+    },
+    {
+      id: 'assessments',
+      label: 'Assessment Workspace',
+      icon: <Sparkles className="h-4 w-4 text-purple-300" />,
+    },
+    {
+      id: 'timeline',
+      label: 'Mission Timeline',
+      icon: <Calendar className="h-4 w-4 text-sky-400" />,
     },
     {
       id: 'telemetry',
       label: 'Telemetry Stream',
-      icon: <LineChart className="h-4 w-4" />,
+      icon: <LineChart className="h-4 w-4 text-telemetry-cyan" />,
     },
     {
       id: 'anatomy',
       label: '3D Anatomy Map',
-      icon: <Activity className="h-4 w-4 text-telemetry-cyan" />,
+      icon: <Layers className="h-4 w-4 text-telemetry-cyan" />,
       badge: (
         <span className="rounded bg-telemetry-cyan/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-telemetry-cyan border border-telemetry-cyan/40">
           3D
@@ -96,25 +138,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ),
     },
     {
-      id: 'intelligence',
-      label: 'Health Intelligence',
-      icon: <Brain className="h-4 w-4 text-purple-400" />,
-      badge: (
-        <span className="rounded bg-purple-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-purple-400 border border-purple-500/30">
-          AI
-        </span>
-      ),
-    },
-    {
-      id: 'alerts',
-      label: 'Operational Alerts',
-      icon: <Bell className="h-4 w-4" />,
-      badge:
-        activeAlertsCount > 0 ? (
-          <span className="rounded bg-rose-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-rose-400 border border-rose-500/40 animate-pulse">
-            {activeAlertsCount}
-          </span>
-        ) : undefined,
+      id: 'roster',
+      label: 'Crew Directory',
+      icon: <Users className="h-4 w-4 text-space-300" />,
     },
   ];
 

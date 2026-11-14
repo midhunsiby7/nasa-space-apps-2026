@@ -477,6 +477,11 @@ export const PersonalBaselinesView: React.FC<PersonalBaselinesViewProps> = ({
                       <span className="text-xs font-bold uppercase tracking-wider text-space-200">
                         Statistical Envelope Parameters
                       </span>
+                      {activeBaseline.baseline_type && (
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-700/50 text-[10px] uppercase font-bold text-cyan-300">
+                          {activeBaseline.baseline_type}
+                        </span>
+                      )}
                       {activeBaseline.maturity && (
                         <span className="px-1.5 py-0.5 rounded bg-space-800 border border-space-700 text-[10px] uppercase text-telemetry-cyan">
                           {activeBaseline.maturity} (v{activeBaseline.version || 1})

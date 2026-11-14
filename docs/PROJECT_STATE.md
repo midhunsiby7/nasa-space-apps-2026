@@ -202,11 +202,12 @@ COSMOLOOKUP follows a decoupled three-tier architecture:
 | **Phase 6: System Integration** | PR #14 (`54f3cb8`) | Complete | 13 E2E workflows, symptom reporting dialog, offline hardening, 103 tests. |
 | **Phase 7: UI/UX & Presentation** | PR #15 (`fb0a8b1`) | Complete | Health Cockpit, 5-point decision matrix, 10-step Judge Tour, HUD visual system. |
 | **PR #10 / PR #16 Reconciliation** | PR #16 (`ce438d9`) | Complete | Baselines view, catalog view, cross-platform runner, 42 integration tests. |
-| **Phase 8: Final Docs & Submission** | `feature/phase-8-...` | **In Progress** | Audited API contract, comprehensive READMEs, submission guide, 103+42 tests. |
+| **Frontend Mission Intelligence & Integration** | `feature/frontend-mission-intelligence` | Complete | Mission Intelligence Center, Trend Observatory, Alert Command Desk, Assessment Workspace, 3D Anatomy evidence links, Reconstructed Timeline, Command Palette, Evidence Report. |
+| **Phase 8: Final Docs & Submission** | PR #17 (`1b7a6cf`) | Complete | Audited API contract, comprehensive READMEs, submission narrative, demo preparation. |
 
 ### Verified Test Summary:
 - **Backend Test Suite:** 103/103 tests passing (`pytest backend/tests`).
-- **Frontend Integration Suite:** 42/42 scenarios passing (`test-integration.mjs`).
+- **Frontend Integration Suite:** 50/50 scenarios passing (`test-integration.mjs`).
 - **Frontend TypeScript Compilation:** 0 errors (`tsc --noEmit`).
 - **Frontend Production Build:** 0 errors (`vite build`).
 
@@ -253,4 +254,4 @@ COSMOLOOKUP follows a decoupled three-tier architecture:
    - `backend/.venv/Scripts/python -m pytest backend/tests` (103 tests)
    - `cd frontend && npm run lint` (`tsc --noEmit`)
    - `cd frontend && npm run build` (`vite build`)
-   - `node frontend/scripts/test-integration.mjs` (42 integration tests)
+   - `node frontend/scripts/test-integration.mjs` (50 integration tests)
