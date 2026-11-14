@@ -11,21 +11,78 @@ export interface MetricMeta {
 }
 
 export const METRIC_METADATA: Record<string, MetricMeta> = {
+  // Authoritative seeded backend metrics
   heart_rate: {
     type: 'heart_rate',
     label: 'Heart Rate',
     shortLabel: 'HR',
     unit: 'bpm',
     color: '#f43f5e', // rose
-    description: 'Autonomous cardiovascular rate telemetry captured via sensor array',
+    description: 'Autonomous cardiovascular rate captured via telemetry array',
     nominalRange: '60 – 100 bpm (rest baseline)',
   },
+  spo2: {
+    type: 'spo2',
+    label: 'Blood Oxygen (SpO2)',
+    shortLabel: 'SpO2',
+    unit: '%',
+    color: '#38bdf8', // cyan
+    description: 'Peripheral arterial capillary oxygen saturation via pulse oximetry',
+    nominalRange: '95.0% – 100.0%',
+  },
+  body_temperature: {
+    type: 'body_temperature',
+    label: 'Body Temperature',
+    shortLabel: 'Core Temp',
+    unit: '°C',
+    color: '#f59e0b', // amber
+    description: 'Internal core thermoregulatory reading via ingestible capsule sensor',
+    nominalRange: '36.5 – 37.5 °C',
+  },
+  respiratory_rate: {
+    type: 'respiratory_rate',
+    label: 'Respiratory Rate',
+    shortLabel: 'Resp',
+    unit: 'breaths/min',
+    color: '#10b981', // emerald
+    description: 'Pulmonary ventilation frequency (breathing cycles per minute)',
+    nominalRange: '12 – 20 breaths/min',
+  },
+  blood_pressure_systolic: {
+    type: 'blood_pressure_systolic',
+    label: 'Systolic Blood Pressure',
+    shortLabel: 'BP Sys',
+    unit: 'mmHg',
+    color: '#a855f7', // violet
+    description: 'Peak arterial pressure during ventricular contraction phase',
+    nominalRange: '90 – 120 mmHg',
+  },
+  blood_pressure_diastolic: {
+    type: 'blood_pressure_diastolic',
+    label: 'Diastolic Blood Pressure',
+    shortLabel: 'BP Dia',
+    unit: 'mmHg',
+    color: '#8b5cf6', // purple
+    description: 'Minimum arterial pressure during ventricular relaxation phase',
+    nominalRange: '60 – 80 mmHg',
+  },
+  sleep_duration: {
+    type: 'sleep_duration',
+    label: 'Sleep Duration',
+    shortLabel: 'Sleep',
+    unit: 'hours',
+    color: '#6366f1', // indigo
+    description: 'Consolidated circadian rest period staging',
+    nominalRange: '7.0 – 9.0 hours',
+  },
+
+  // Fallback compatibility entries for alternative / analog datasets
   blood_oxygen: {
     type: 'blood_oxygen',
     label: 'Blood Oxygen (SpO2)',
     shortLabel: 'SpO2',
     unit: '%',
-    color: '#38bdf8', // cyan
+    color: '#38bdf8',
     description: 'Peripheral arterial oxygen saturation via pulse oximetry',
     nominalRange: '95.0% – 100.0%',
   },
@@ -34,7 +91,7 @@ export const METRIC_METADATA: Record<string, MetricMeta> = {
     label: 'Core Body Temperature',
     shortLabel: 'Core Temp',
     unit: '°C',
-    color: '#f59e0b', // amber
+    color: '#f59e0b',
     description: 'Internal thermoregulatory reading via ingestible thermal telemetry',
     nominalRange: '36.5 – 37.5 °C',
   },
@@ -43,24 +100,35 @@ export const METRIC_METADATA: Record<string, MetricMeta> = {
     label: 'Radiation Exposure',
     shortLabel: 'Rad Dose',
     unit: 'mSv',
-    color: '#a855f7', // violet
+    color: '#ec4899', // pink
     description: 'Dosimetric ionizing cosmic radiation cumulative exposure',
-    nominalRange: 'Varies with solar activity & habitat shielding',
+    nominalRange: 'Varies with habitat shielding & solar weather',
   },
 };
 
-export function getMetricMeta(type: string): MetricMeta {
-  return (
-    METRIC_METADATA[type] || {
-      type,
-      label: type.replace(/_/g, ' ').toUpperCase(),
-      shortLabel: type.substring(0, 4).toUpperCase(),
-      unit: '',
-      color: '#94a3b8',
-      description: 'Generic telemetry measurement',
-      nominalRange: 'N/A',
+export function getMetricMeta(type: string, rawUnit?: string): MetricMeta {
+  const meta = METRIC_METADATA[type];
+  if (meta) {
+    if (rawUnit && meta.unit !== '°C' && rawUnit !== meta.unit) {
+      return { ...meta, unit: rawUnit };
     }
-  );
+    return meta;
+  }
+
+  // Graceful fallback for unmapped metric types
+  const formattedName = type
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  return {
+    type,
+    label: formattedName,
+    shortLabel: type.substring(0, 4).toUpperCase(),
+    unit: rawUnit || '',
+    color: '#94a3b8',
+    description: `Telemetry reading for ${formattedName}`,
+    nominalRange: 'Reference baseline not defined',
+  };
 }
 
 export function formatTimestamp(isoString: string): string {
@@ -132,13 +200,13 @@ export function formatProvenance(isSynthetic: boolean): {
       label: 'SYNTHETIC SIMULATION',
       shortLabel: 'SYNTHETIC',
       badgeClass: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-      description: 'Algorithmic physiological simulation for mission planning & testing.',
+      description: 'Algorithmic physiological simulation for mission evaluation & testing.',
     };
   }
   return {
     label: 'EMPIRICAL RESEARCH',
     shortLabel: 'EMPIRICAL',
     badgeClass: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
-    description: 'Empirical data derived from actual spaceflight or analog physiological studies.',
+    description: 'Empirical data derived from actual spaceflight or analog physiological research.',
   };
 }

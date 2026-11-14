@@ -1,133 +1,341 @@
 import { Astronaut } from '../types/astronaut';
 import { Measurement } from '../types/measurement';
 
+/**
+ * Synthetic Demonstration Astronauts
+ * Strictly aligned with backend/app/seed.py.
+ * All profiles and telemetry points are explicitly synthetic and fictional.
+ */
 export const DEMO_ASTRONAUTS: Astronaut[] = [
   {
     id: 'astro-001',
-    name: 'Dr. Sarah Connor',
-    crew_role: 'Commander / Medical Officer',
-    mission_name: 'Artemis VII',
-    mission_day: 42,
-    created_at: '2026-10-01T08:00:00Z',
-  },
-  {
-    id: 'astro-002',
-    name: 'Alex Chen',
-    crew_role: 'Flight Engineer',
-    mission_name: 'Artemis VII',
-    mission_day: 42,
-    created_at: '2026-10-01T08:00:00Z',
-  },
-  {
-    id: 'astro-003',
-    name: 'Dr. Marcus Vance',
-    crew_role: 'Payload Specialist / Biologist',
-    mission_name: 'Mars Transit-1',
-    mission_day: 184,
-    created_at: '2026-05-14T12:00:00Z',
-  },
-  {
-    id: 'astro-004',
-    name: 'Elena Rostova',
-    crew_role: 'Pilot / Systems Specialist',
-    mission_name: 'Mars Transit-1',
-    mission_day: 184,
-    created_at: '2026-05-14T12:00:00Z',
-  },
-  {
-    id: 'astro-005',
-    name: 'Kenji Sato',
-    crew_role: 'Science Officer / Habitat Tech',
-    mission_name: 'ISS Expedition 74',
-    mission_day: 96,
-    created_at: '2026-08-10T14:30:00Z',
+    name: 'Alex Morgan',
+    crew_role: 'Mission Specialist',
+    mission_name: 'AURORA-1',
+    mission_day: 45,
+    created_at: '2026-09-30T08:00:00Z',
   },
 ];
 
-// Helper to generate time series telemetry samples around recent timestamps
-function generateTelemetrySeries(
-  astronautId: string,
-  baseTimeIso: string
-): Measurement[] {
-  const baseTime = new Date(baseTimeIso).getTime();
-  const measurements: Measurement[] = [];
-  const count = 16; // 16 discrete time points at 30-min intervals
+function generateSeededTelemetry(astronautId: string): Measurement[] {
+  // 12-hour mission interval matching backend seed
+  const baseTime = new Date('2026-11-14T08:00:00Z').getTime() - 12 * 60 * 60 * 1000;
+  const t0 = new Date(baseTime).toISOString();
+  const t6 = new Date(baseTime + 6 * 60 * 60 * 1000).toISOString();
+  const t10 = new Date(baseTime + 10 * 60 * 60 * 1000).toISOString();
+  const t12 = new Date(baseTime + 12 * 60 * 60 * 1000).toISOString();
 
-  for (let i = 0; i < count; i++) {
-    const timestamp = new Date(baseTime - (count - 1 - i) * 30 * 60 * 1000).toISOString();
-    const timeIndex = i;
-
-    // 1. Heart Rate (bpm)
-    const hrVal = Math.round(68 + Math.sin(timeIndex * 0.4) * 8 + (timeIndex === 11 ? 16 : 0));
-    const hrSynthetic = astronautId !== 'astro-001' || timeIndex > 8;
-    measurements.push({
-      id: `meas-${astronautId}-hr-${i}`,
+  return [
+    // T - 12 hours (Deep sleep interval)
+    {
+      id: 'meas-demo-001',
       astronaut_id: astronautId,
       measurement_type: 'heart_rate',
-      value: hrVal,
+      value: 58.0,
       unit: 'bpm',
-      measured_at: timestamp,
-      source: hrSynthetic ? 'Synthetic Biometrics Simulator v1.4' : 'BioHarness v3 Telemetry Stream',
-      context: timeIndex === 11 ? 'Moderate aerobic countermeasure workout' : 'Habitat intra-vehicular baseline',
-      data_quality: timeIndex === 6 ? 'interpolated' : 'nominal',
-      is_synthetic: hrSynthetic,
-    });
-
-    // 2. Blood Oxygen (SpO2 %)
-    const spo2Val = +(97.5 + Math.cos(timeIndex * 0.3) * 0.9 - (timeIndex === 11 ? 0.6 : 0)).toFixed(1);
-    const spo2Synthetic = astronautId === 'astro-003' || astronautId === 'astro-004';
-    measurements.push({
-      id: `meas-${astronautId}-spo2-${i}`,
-      astronaut_id: astronautId,
-      measurement_type: 'blood_oxygen',
-      value: spo2Val,
-      unit: '%',
-      measured_at: timestamp,
-      source: spo2Synthetic ? 'Empirical Analog Transfer Model' : 'Pulse Oximeter Optical Band',
-      context: 'Atmospheric partial pressure: 101.3 kPa (Nominal)',
+      measured_at: t0,
+      source: 'BioHarness Telemetry Band',
+      context: 'Deep sleep interval',
       data_quality: 'nominal',
-      is_synthetic: spo2Synthetic,
-    });
-
-    // 3. Core Temperature (celsius)
-    const tempVal = +(36.9 + Math.sin(timeIndex * 0.25) * 0.35 + (timeIndex === 11 ? 0.5 : 0)).toFixed(2);
-    const tempSynthetic = false; // Empirical ingestible capsule sensor data
-    measurements.push({
-      id: `meas-${astronautId}-temp-${i}`,
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-002',
       astronaut_id: astronautId,
-      measurement_type: 'core_temperature',
-      value: tempVal,
+      measurement_type: 'body_temperature',
+      value: 36.6,
       unit: 'celsius',
-      measured_at: timestamp,
-      source: 'Ingestible Thermal Sensor Capsule',
-      context: timeIndex === 11 ? 'Post-exercise active thermoregulation' : 'Standard circadian baseline',
-      data_quality: timeIndex === 3 ? 'noisy' : 'nominal',
-      is_synthetic: tempSynthetic,
-    });
-
-    // 4. Radiation Dose (mSv cumulative / habitat flux)
-    const radVal = +(0.038 + (timeIndex * 0.002) + (astronautId.includes('003') ? 0.04 : 0)).toFixed(4);
-    measurements.push({
-      id: `meas-${astronautId}-rad-${i}`,
-      astronaut_id: astronautId,
-      measurement_type: 'radiation_dose',
-      value: radVal,
-      unit: 'mSv',
-      measured_at: timestamp,
-      source: 'Active Silicon Dosimeter Array (B-Habitat)',
-      context: 'Deep-space GCR flux background monitoring',
+      measured_at: t0,
+      source: 'Ingestible Thermal Core Sensor',
+      context: 'Deep sleep interval',
       data_quality: 'nominal',
-      is_synthetic: false,
-    });
-  }
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-003',
+      astronaut_id: astronautId,
+      measurement_type: 'spo2',
+      value: 98.5,
+      unit: '%',
+      measured_at: t0,
+      source: 'Pulse Oximeter Optical Band',
+      context: 'Deep sleep interval',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-004',
+      astronaut_id: astronautId,
+      measurement_type: 'respiratory_rate',
+      value: 12.0,
+      unit: 'breaths/min',
+      measured_at: t0,
+      source: 'BioHarness Telemetry Band',
+      context: 'Deep sleep interval',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-005',
+      astronaut_id: astronautId,
+      measurement_type: 'blood_pressure_systolic',
+      value: 112.0,
+      unit: 'mmHg',
+      measured_at: t0,
+      source: 'Ambulatory Blood Pressure Cuff',
+      context: 'Deep sleep interval',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-006',
+      astronaut_id: astronautId,
+      measurement_type: 'blood_pressure_diastolic',
+      value: 72.0,
+      unit: 'mmHg',
+      measured_at: t0,
+      source: 'Ambulatory Blood Pressure Cuff',
+      context: 'Deep sleep interval',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-007',
+      astronaut_id: astronautId,
+      measurement_type: 'sleep_duration',
+      value: 7.4,
+      unit: 'hours',
+      measured_at: t0,
+      source: 'Sleep Staging Algorithm',
+      context: 'Consolidated night rest',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
 
-  return measurements;
+    // T - 6 hours (Morning cabin briefing)
+    {
+      id: 'meas-demo-008',
+      astronaut_id: astronautId,
+      measurement_type: 'heart_rate',
+      value: 72.0,
+      unit: 'bpm',
+      measured_at: t6,
+      source: 'BioHarness Telemetry Band',
+      context: 'Morning cabin briefing',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-009',
+      astronaut_id: astronautId,
+      measurement_type: 'body_temperature',
+      value: 36.9,
+      unit: 'celsius',
+      measured_at: t6,
+      source: 'Ingestible Thermal Core Sensor',
+      context: 'Morning cabin briefing',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-010',
+      astronaut_id: astronautId,
+      measurement_type: 'spo2',
+      value: 98.2,
+      unit: '%',
+      measured_at: t6,
+      source: 'Pulse Oximeter Optical Band',
+      context: 'Morning cabin briefing',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-011',
+      astronaut_id: astronautId,
+      measurement_type: 'respiratory_rate',
+      value: 14.0,
+      unit: 'breaths/min',
+      measured_at: t6,
+      source: 'BioHarness Telemetry Band',
+      context: 'Morning cabin briefing',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-012',
+      astronaut_id: astronautId,
+      measurement_type: 'blood_pressure_systolic',
+      value: 118.0,
+      unit: 'mmHg',
+      measured_at: t6,
+      source: 'Ambulatory Blood Pressure Cuff',
+      context: 'Morning cabin briefing',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-013',
+      astronaut_id: astronautId,
+      measurement_type: 'blood_pressure_diastolic',
+      value: 76.0,
+      unit: 'mmHg',
+      measured_at: t6,
+      source: 'Ambulatory Blood Pressure Cuff',
+      context: 'Morning cabin briefing',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+
+    // T - 2 hours (ARED resistive exercise)
+    {
+      id: 'meas-demo-014',
+      astronaut_id: astronautId,
+      measurement_type: 'heart_rate',
+      value: 142.0,
+      unit: 'bpm',
+      measured_at: t10,
+      source: 'BioHarness Telemetry Band',
+      context: 'ARED resistive countermeasure exercise',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-015',
+      astronaut_id: astronautId,
+      measurement_type: 'body_temperature',
+      value: 37.4,
+      unit: 'celsius',
+      measured_at: t10,
+      source: 'Ingestible Thermal Core Sensor',
+      context: 'ARED resistive countermeasure exercise',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-016',
+      astronaut_id: astronautId,
+      measurement_type: 'spo2',
+      value: 97.8,
+      unit: '%',
+      measured_at: t10,
+      source: 'Pulse Oximeter Optical Band',
+      context: 'ARED resistive countermeasure exercise',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-017',
+      astronaut_id: astronautId,
+      measurement_type: 'respiratory_rate',
+      value: 26.0,
+      unit: 'breaths/min',
+      measured_at: t10,
+      source: 'BioHarness Telemetry Band',
+      context: 'ARED resistive countermeasure exercise',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-018',
+      astronaut_id: astronautId,
+      measurement_type: 'blood_pressure_systolic',
+      value: 136.0,
+      unit: 'mmHg',
+      measured_at: t10,
+      source: 'Ambulatory Blood Pressure Cuff',
+      context: 'ARED resistive countermeasure exercise',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-019',
+      astronaut_id: astronautId,
+      measurement_type: 'blood_pressure_diastolic',
+      value: 82.0,
+      unit: 'mmHg',
+      measured_at: t10,
+      source: 'Ambulatory Blood Pressure Cuff',
+      context: 'ARED resistive countermeasure exercise',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+
+    // Current (Post-exercise recovery in habitat)
+    {
+      id: 'meas-demo-020',
+      astronaut_id: astronautId,
+      measurement_type: 'heart_rate',
+      value: 68.0,
+      unit: 'bpm',
+      measured_at: t12,
+      source: 'BioHarness Telemetry Band',
+      context: 'Post-exercise recovery in habitat',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-021',
+      astronaut_id: astronautId,
+      measurement_type: 'body_temperature',
+      value: 36.8,
+      unit: 'celsius',
+      measured_at: t12,
+      source: 'Ingestible Thermal Core Sensor',
+      context: 'Post-exercise recovery in habitat',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-022',
+      astronaut_id: astronautId,
+      measurement_type: 'spo2',
+      value: 99.0,
+      unit: '%',
+      measured_at: t12,
+      source: 'Pulse Oximeter Optical Band',
+      context: 'Post-exercise recovery in habitat',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-023',
+      astronaut_id: astronautId,
+      measurement_type: 'respiratory_rate',
+      value: 14.0,
+      unit: 'breaths/min',
+      measured_at: t12,
+      source: 'BioHarness Telemetry Band',
+      context: 'Post-exercise recovery in habitat',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-024',
+      astronaut_id: astronautId,
+      measurement_type: 'blood_pressure_systolic',
+      value: 116.0,
+      unit: 'mmHg',
+      measured_at: t12,
+      source: 'Ambulatory Blood Pressure Cuff',
+      context: 'Post-exercise recovery in habitat',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+    {
+      id: 'meas-demo-025',
+      astronaut_id: astronautId,
+      measurement_type: 'blood_pressure_diastolic',
+      value: 74.0,
+      unit: 'mmHg',
+      measured_at: t12,
+      source: 'Ambulatory Blood Pressure Cuff',
+      context: 'Post-exercise recovery in habitat',
+      data_quality: 'nominal',
+      is_synthetic: true,
+    },
+  ];
 }
 
 export const DEMO_MEASUREMENTS: Record<string, Measurement[]> = {
-  'astro-001': generateTelemetrySeries('astro-001', '2026-11-14T08:00:00Z'),
-  'astro-002': generateTelemetrySeries('astro-002', '2026-11-14T08:00:00Z'),
-  'astro-003': generateTelemetrySeries('astro-003', '2026-11-14T08:00:00Z'),
-  'astro-004': generateTelemetrySeries('astro-004', '2026-11-14T08:00:00Z'),
-  'astro-005': generateTelemetrySeries('astro-005', '2026-11-14T08:00:00Z'),
+  'astro-001': generateSeededTelemetry('astro-001'),
 };

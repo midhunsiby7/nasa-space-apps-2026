@@ -5,7 +5,8 @@ import {
   Heart,
   Droplet,
   Thermometer,
-  Zap,
+  Wind,
+  Info,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement, MeasurementType } from '../../types/measurement';
@@ -19,7 +20,7 @@ interface AnatomyViewportProps {
   onSwitchToChart: () => void;
 }
 
-type AnatomicalRegion = 'cardiopulmonary' | 'core' | 'systemic' | 'cranial';
+type AnatomicalRegion = 'cardiopulmonary' | 'core' | 'respiratory' | 'cranial';
 
 export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
   astronaut,
@@ -32,12 +33,12 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
   const [rotationAngle, setRotationAngle] = useState<number>(0);
   const [pitchAngle, setPitchAngle] = useState<number>(0);
 
-  // Map regions to measurement types
+  // Map regions to authoritative backend metric types
   const regionMetrics: Record<AnatomicalRegion, MeasurementType> = {
     cardiopulmonary: 'heart_rate',
-    core: 'core_temperature',
-    systemic: 'radiation_dose',
-    cranial: 'blood_oxygen',
+    core: 'body_temperature',
+    respiratory: 'respiratory_rate',
+    cranial: 'spo2',
   };
 
   const activeMetricType = regionMetrics[selectedRegion];
@@ -58,7 +59,7 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Viewport Header */}
+      {/* Prototype Status Notification Banner */}
       <div className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -67,12 +68,12 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
               <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-space-100">
                 3D Anatomical Telemetry Viewport
               </h3>
-              <span className="rounded bg-telemetry-cyan/15 px-2 py-0.5 font-mono text-[10px] text-telemetry-cyan border border-telemetry-cyan/30">
-                CANVAS INTEGRATION READY
+              <span className="rounded bg-telemetry-amber/15 px-2 py-0.5 font-mono text-[10px] text-telemetry-amber border border-telemetry-amber/30">
+                PROTOTYPE WIREFRAME
               </span>
             </div>
             <p className="font-mono text-xs text-space-400 mt-1">
-              Select anatomical zones to inspect localized physiological sensors. Architecture prepared for WebGL / Three.js.
+              Interactive anatomical zone selector binding localized telemetry to body coordinates. Full WebGL / Three.js integration scheduled for Phase 3.
             </p>
           </div>
 
@@ -108,12 +109,13 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
           <div className="absolute top-4 left-4 font-mono text-[11px] text-space-400 space-y-1 z-10">
             <div>TARGET: <span className="text-space-100 font-bold">{astronaut?.name || 'ASTRONAUT STANDBY'}</span></div>
             <div>COORDINATES: <span className="text-telemetry-cyan">X: 0.00 Y: {rotationAngle}° Z: {pitchAngle}°</span></div>
-            <div>STATUS: <span className="text-telemetry-emerald">TELEMETRY LINK ACTIVE</span></div>
+            <div>MODE: <span className="text-telemetry-emerald">PERSPECTIVE MAPPING</span></div>
           </div>
 
           <div className="absolute top-4 right-4 z-10">
-            <span className="font-mono text-[10px] text-space-400 px-2 py-1 rounded bg-space-900/80 border border-space-700">
-              FRAME RATE: 60 FPS
+            <span className="font-mono text-[10px] text-space-400 px-2 py-1 rounded bg-space-900/80 border border-space-700 flex items-center gap-1">
+              <Info className="h-3 w-3 text-telemetry-cyan" />
+              R3F CANVAS READY
             </span>
           </div>
 
@@ -133,7 +135,7 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
-              {/* Head / Cranial */}
+              {/* Head / Cranial (SpO2) */}
               <circle
                 cx="110"
                 cy="40"
@@ -147,7 +149,7 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
               {/* Neck */}
               <line x1="110" y1="64" x2="110" y2="76" stroke="#3c527a" strokeWidth="2" />
 
-              {/* Torso / Cardiopulmonary */}
+              {/* Torso / Cardiopulmonary (Heart Rate) */}
               <path
                 d="M75 76 L145 76 L135 150 L85 150 Z"
                 stroke={selectedRegion === 'cardiopulmonary' ? '#f43f5e' : '#3c527a'}
@@ -167,42 +169,38 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
                 onClick={() => handleRegionClick('core')}
               />
 
-              {/* Left Arm */}
+              {/* Left Arm / Respiratory */}
               <path
                 d="M75 76 L40 140 L30 200"
-                stroke={selectedRegion === 'systemic' ? '#a855f7' : '#273856'}
+                stroke={selectedRegion === 'respiratory' ? '#10b981' : '#273856'}
                 strokeWidth="2"
                 strokeLinecap="round"
                 className="cursor-pointer"
-                onClick={() => handleRegionClick('systemic')}
+                onClick={() => handleRegionClick('respiratory')}
               />
-              {/* Right Arm */}
+              {/* Right Arm / Respiratory */}
               <path
                 d="M145 76 L180 140 L190 200"
-                stroke={selectedRegion === 'systemic' ? '#a855f7' : '#273856'}
+                stroke={selectedRegion === 'respiratory' ? '#10b981' : '#273856'}
                 strokeWidth="2"
                 strokeLinecap="round"
                 className="cursor-pointer"
-                onClick={() => handleRegionClick('systemic')}
+                onClick={() => handleRegionClick('respiratory')}
               />
 
               {/* Left Leg */}
               <path
                 d="M95 210 L85 290 L80 360"
-                stroke={selectedRegion === 'systemic' ? '#a855f7' : '#273856'}
+                stroke="#273856"
                 strokeWidth="2"
                 strokeLinecap="round"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('systemic')}
               />
               {/* Right Leg */}
               <path
                 d="M125 210 L135 290 L140 360"
-                stroke={selectedRegion === 'systemic' ? '#a855f7' : '#273856'}
+                stroke="#273856"
                 strokeWidth="2"
                 strokeLinecap="round"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('systemic')}
               />
 
               {/* Hotspot: Heart / Cardiopulmonary */}
@@ -236,7 +234,7 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
                 onClick={() => handleRegionClick('core')}
               />
 
-              {/* Hotspot: Cranial */}
+              {/* Hotspot: Cranial (SpO2) */}
               <circle
                 cx="110"
                 cy="40"
@@ -246,6 +244,18 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
                 strokeWidth="1.5"
                 className="cursor-pointer"
                 onClick={() => handleRegionClick('cranial')}
+              />
+
+              {/* Hotspot: Respiratory / Thoracic */}
+              <circle
+                cx="98"
+                cy="115"
+                r="4"
+                fill="#10b981"
+                stroke="#ffffff"
+                strokeWidth="1.5"
+                className="cursor-pointer"
+                onClick={() => handleRegionClick('respiratory')}
               />
             </svg>
           </div>
@@ -257,25 +267,25 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
               onClick={() => handleRegionClick('cardiopulmonary')}
               className={`flex items-center gap-1 ${selectedRegion === 'cardiopulmonary' ? 'text-rose-400 font-bold' : 'text-space-300'}`}
             >
-              <Heart className="h-3 w-3" /> Cardiopulmonary
-            </button>
-            <button
-              onClick={() => handleRegionClick('core')}
-              className={`flex items-center gap-1 ${selectedRegion === 'core' ? 'text-amber-400 font-bold' : 'text-space-300'}`}
-            >
-              <Thermometer className="h-3 w-3" /> Core Vitals
+              <Heart className="h-3 w-3" /> Heart Rate
             </button>
             <button
               onClick={() => handleRegionClick('cranial')}
               className={`flex items-center gap-1 ${selectedRegion === 'cranial' ? 'text-sky-400 font-bold' : 'text-space-300'}`}
             >
-              <Droplet className="h-3 w-3" /> Oxygen / Cranial
+              <Droplet className="h-3 w-3" /> SpO2 Oxygen
             </button>
             <button
-              onClick={() => handleRegionClick('systemic')}
-              className={`flex items-center gap-1 ${selectedRegion === 'systemic' ? 'text-purple-400 font-bold' : 'text-space-300'}`}
+              onClick={() => handleRegionClick('core')}
+              className={`flex items-center gap-1 ${selectedRegion === 'core' ? 'text-amber-400 font-bold' : 'text-space-300'}`}
             >
-              <Zap className="h-3 w-3" /> Systemic Dose
+              <Thermometer className="h-3 w-3" /> Body Temp
+            </button>
+            <button
+              onClick={() => handleRegionClick('respiratory')}
+              className={`flex items-center gap-1 ${selectedRegion === 'respiratory' ? 'text-emerald-400 font-bold' : 'text-space-300'}`}
+            >
+              <Wind className="h-3 w-3" /> Respiration
             </button>
           </div>
         </div>
@@ -295,13 +305,13 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
             {/* Metric Overview */}
             <div className="space-y-4 font-mono">
               <div>
-                <span className="text-xs text-space-400 block mb-1">BOUND METRIC CHANNEL:</span>
+                <span className="text-xs text-space-400 block mb-1">MAPPED TELEMETRY CHANNEL:</span>
                 <span className="text-sm font-bold text-space-100 flex items-center gap-2">
                   <span
                     className="inline-block h-2 w-2 rounded-full"
                     style={{ backgroundColor: meta.color }}
                   />
-                  {meta.label}
+                  {meta.label} (<code className="text-telemetry-cyan">{activeMetricType}</code>)
                 </span>
                 <p className="text-[11px] text-space-400 mt-1 leading-relaxed">
                   {meta.description}
@@ -311,7 +321,7 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
               {/* Latest Value Card */}
               <div className="rounded-lg bg-space-900 p-4 border border-space-750">
                 <div className="flex items-baseline justify-between mb-2">
-                  <span className="text-xs text-space-400">CURRENT VALUE:</span>
+                  <span className="text-xs text-space-400">LATEST OBSERVATION:</span>
                   <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-extrabold text-space-100">
                       {latest ? latest.value : '—'}
@@ -336,8 +346,8 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
 
               {/* Sourced Hardware Information */}
               <div className="rounded-lg bg-space-900/60 p-3 border border-space-750 text-xs">
-                <span className="text-[11px] text-space-400 block mb-1">TRANSMITTING SENSOR:</span>
-                <span className="text-space-200">{latest?.source || 'BioHarness v3 Sensor Array'}</span>
+                <span className="text-[11px] text-space-400 block mb-1">RECORDED SENSOR:</span>
+                <span className="text-space-200">{latest?.source || 'No signal recorded'}</span>
                 {latest?.context && (
                   <p className="text-[11px] text-space-400 mt-1 italic">
                     Context: {latest.context}

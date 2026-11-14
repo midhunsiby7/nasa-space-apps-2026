@@ -3,7 +3,18 @@
  */
 export type DataQuality = 'nominal' | 'degraded' | 'noisy' | 'interpolated' | 'calibrating';
 
-export type MeasurementType = 'heart_rate' | 'blood_oxygen' | 'core_temperature' | 'radiation_dose' | string;
+export type MeasurementType =
+  | 'heart_rate'
+  | 'spo2'
+  | 'body_temperature'
+  | 'respiratory_rate'
+  | 'blood_pressure_systolic'
+  | 'blood_pressure_diastolic'
+  | 'sleep_duration'
+  | 'blood_oxygen'
+  | 'core_temperature'
+  | 'radiation_dose'
+  | string;
 
 export interface Measurement {
   id: string;
