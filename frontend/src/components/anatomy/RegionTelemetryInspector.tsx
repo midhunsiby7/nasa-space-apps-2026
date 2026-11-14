@@ -401,10 +401,10 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
             {trend ? (
               <div className="space-y-2 font-mono text-xs">
                 <div className="flex items-center justify-between rounded bg-space-900 p-2 border border-space-800">
-                  <span className="text-[11px] text-space-400">Sen&apos;s Slope Rate of Change:</span>
+                  <span className="text-[11px] text-space-400">Sen&apos;s Slope Rate of Change (24h):</span>
                   <span className="font-bold text-space-200">
                     {trend.sens_slope !== null && trend.sens_slope !== undefined
-                      ? `${trend.sens_slope > 0 ? '+' : ''}${trend.sens_slope.toFixed(3)} ${trend.unit}/h`
+                      ? `${trend.sens_slope > 0 ? '+' : ''}${trend.sens_slope.toFixed(2)} ${trend.unit} / 24h`
                       : 'N/A'}
                   </span>
                 </div>

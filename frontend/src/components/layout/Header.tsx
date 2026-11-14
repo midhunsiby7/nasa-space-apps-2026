@@ -19,6 +19,8 @@ interface HeaderProps {
   isDemoMode?: boolean;
   onToggleDemoGuide?: () => void;
   isDemoGuideOpen?: boolean;
+  onOpenCommandPalette?: () => void;
+  onOpenEvidenceReport?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,6 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
   isDemoMode = false,
   onToggleDemoGuide,
   isDemoGuideOpen = false,
+  onOpenCommandPalette,
+  onOpenEvidenceReport,
 }) => {
   const [utcTime, setUtcTime] = useState<string>('');
 
@@ -76,6 +80,34 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Controls & Connection State */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Quick Command Palette Button */}
+          {onOpenCommandPalette && (
+            <button
+              onClick={onOpenCommandPalette}
+              aria-label="Open Command Palette (Ctrl+K)"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-850 hover:bg-space-800 border border-space-700 text-xs font-mono text-space-300 hover:text-white transition-colors"
+              title="Open Command Palette (Ctrl+K / Cmd+K)"
+            >
+              <span>Command</span>
+              <kbd className="px-1 py-0.5 rounded bg-space-800 border border-space-650 text-[10px] text-telemetry-cyan font-semibold">
+                Ctrl+K
+              </kbd>
+            </button>
+          )}
+
+          {/* Quick Evidence Report Button */}
+          {onOpenEvidenceReport && (
+            <button
+              onClick={onOpenEvidenceReport}
+              aria-label="Open Crew Evidence Report"
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-850 hover:bg-space-800 border border-space-700 text-xs font-mono text-space-300 hover:text-white transition-colors"
+              title="Open Crew Evidence Report"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 text-sky-400" />
+              <span>Report</span>
+            </button>
+          )}
+
           {/* Judge Demo Walkthrough Guide Button */}
           {onToggleDemoGuide && (
             <button

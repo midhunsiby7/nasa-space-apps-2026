@@ -7,8 +7,13 @@ import { ProvenanceNotice } from './components/dashboard/ProvenanceNotice';
 import { AstronautDirectory } from './components/astronaut/AstronautDirectory';
 import { AstronautProfileModal } from './components/astronaut/AstronautProfileModal';
 import { TelemetryStreamSection } from './components/telemetry/TelemetryStreamSection';
-import { HealthIntelligenceSection } from './components/intelligence/HealthIntelligenceSection';
-import { AlertsHub } from './components/alert/AlertsHub';
+import { MissionIntelligenceCenter } from './components/intelligence/MissionIntelligenceCenter';
+import { TrendObservatory } from './components/trend/TrendObservatory';
+import { AlertCommandDesk } from './components/alert/AlertCommandDesk';
+import { AssessmentWorkspace } from './components/assessment/AssessmentWorkspace';
+import { MissionTimeline } from './components/timeline/MissionTimeline';
+import { CommandPalette } from './components/navigation/CommandPalette';
+import { EvidenceReportModal } from './components/reports/EvidenceReportModal';
 import { AnatomyViewport } from './components/anatomy/AnatomyViewport';
 import { NonAnatomicalDataDrawer } from './components/anatomy/NonAnatomicalDataDrawer';
 import { JudgeDemoController } from './components/demo/JudgeDemoController';
@@ -61,6 +66,20 @@ export const App: React.FC = () => {
   const [isProvenanceModalOpen, setIsProvenanceModalOpen] = useState<boolean>(false);
   const [isNonAnatomicalOpen, setIsNonAnatomicalOpen] = useState<boolean>(false);
   const [isDemoGuideOpen, setIsDemoGuideOpen] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isEvidenceReportOpen, setIsEvidenceReportOpen] = useState<boolean>(false);
+
+  // Global Ctrl+K / Cmd+K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Subscribe to connection state changes
   useEffect(() => {
@@ -297,6 +316,8 @@ export const App: React.FC = () => {
       onOpenNonAnatomical={() => setIsNonAnatomicalOpen(true)}
       onToggleDemoGuide={() => setIsDemoGuideOpen((prev) => !prev)}
       isDemoGuideOpen={isDemoGuideOpen}
+      onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+      onOpenEvidenceReport={() => setIsEvidenceReportOpen(true)}
     >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Selected Astronaut Status Banner */}
@@ -398,26 +419,85 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'intelligence' && (
-              <HealthIntelligenceSection
+              <MissionIntelligenceCenter
                 astronaut={selectedAstronaut}
                 baselines={baselines}
                 trends={trends}
                 freshness={freshness}
                 assessment={latestAssessment}
+                alerts={alerts}
                 isLoading={isLoadingIntelligence}
                 error={intelligenceError}
                 onRefresh={() => selectedAstronautId && fetchIntelligence(selectedAstronautId)}
                 onRunAssessment={handleRunAssessment}
                 isEvaluating={isEvaluatingAssessment}
+                onNavigateToTab={(tab) => setActiveTab(tab)}
+                onSelectMetric={(m) => setSelectedMetric(m)}
+                onOpenReportModal={() => setIsEvidenceReportOpen(true)}
+              />
+            )}
+
+            {activeTab === 'trends' && (
+              <TrendObservatory
+                astronaut={selectedAstronaut}
+                trends={trends}
+                freshness={freshness}
+                baselines={baselines}
+                selectedMetric={selectedMetric}
+                onSelectMetric={(m) => setSelectedMetric(m)}
+                onNavigateToTelemetry={(m) => {
+                  setSelectedMetric(m);
+                  setActiveTab('telemetry');
+                }}
+                onNavigateToBaselines={(m) => {
+                  setSelectedMetric(m);
+                  setActiveTab('baselines');
+                }}
+                onRefresh={() => selectedAstronautId && fetchIntelligence(selectedAstronautId)}
               />
             )}
 
             {activeTab === 'alerts' && (
-              <AlertsHub
+              <AlertCommandDesk
                 alerts={alerts}
                 onAcknowledgeAlert={handleAcknowledgeAlert}
                 onResolveAlert={handleResolveAlert}
+                onNavigateToTelemetry={(m) => {
+                  setSelectedMetric(m);
+                  setActiveTab('telemetry');
+                }}
                 isLoading={isLoadingIntelligence}
+              />
+            )}
+
+            {activeTab === 'assessments' && (
+              <AssessmentWorkspace
+                astronaut={selectedAstronaut}
+                latestAssessment={latestAssessment}
+                onRunAssessment={handleRunAssessment}
+                isEvaluating={isEvaluatingAssessment}
+                onNavigateToTelemetry={(m) => {
+                  setSelectedMetric(m);
+                  setActiveTab('telemetry');
+                }}
+                onNavigateToBaselines={(m) => {
+                  setSelectedMetric(m);
+                  setActiveTab('baselines');
+                }}
+                onOpenReportModal={() => setIsEvidenceReportOpen(true)}
+              />
+            )}
+
+            {activeTab === 'timeline' && (
+              <MissionTimeline
+                astronaut={selectedAstronaut}
+                measurements={measurements}
+                baselines={baselines}
+                trends={trends}
+                assessment={latestAssessment}
+                alerts={alerts}
+                onNavigateToTab={(tab) => setActiveTab(tab)}
+                onSelectMetric={(m) => setSelectedMetric(m)}
               />
             )}
 
@@ -506,6 +586,34 @@ export const App: React.FC = () => {
         onSelectMetric={(m) => setSelectedMetric(m)}
         onTriggerDemoAction={handleTriggerDemoAction}
         selectedAstronautId={selectedAstronautId}
+      />
+
+      {/* Global Command Palette (Ctrl+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        astronauts={astronauts}
+        selectedAstronautId={selectedAstronautId}
+        onSelectAstronaut={(id) => setSelectedAstronautId(id)}
+        onNavigateToTab={(tab) => setActiveTab(tab)}
+        availableMetrics={availableMetrics}
+        selectedMetric={selectedMetric}
+        onSelectMetric={(m) => setSelectedMetric(m)}
+        onOpenReportModal={() => setIsEvidenceReportOpen(true)}
+        onRunAssessment={() => handleRunAssessment()}
+      />
+
+      {/* Comprehensive Crew Evidence Report Modal */}
+      <EvidenceReportModal
+        isOpen={isEvidenceReportOpen}
+        onClose={() => setIsEvidenceReportOpen(false)}
+        astronaut={selectedAstronaut}
+        measurements={measurements}
+        baselines={baselines}
+        trends={trends}
+        freshness={freshness}
+        assessment={latestAssessment}
+        alerts={alerts}
       />
     </Layout>
   );

@@ -496,8 +496,16 @@ class ApiClient {
   /**
    * GET /api/v1/astronauts/{astronaut_id}/trends
    */
-  public async getTrends(astronautId: string): Promise<AstronautTrendsResponse> {
-    const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/trends`;
+  public async getTrends(
+    astronautId: string,
+    params?: { context?: string; lookback_hours?: number }
+  ): Promise<AstronautTrendsResponse> {
+    const query = new URLSearchParams();
+    if (params?.context) query.set('context', params.context);
+    if (params?.lookback_hours) query.set('lookback_hours', String(params.lookback_hours));
+
+    const qs = query.toString();
+    const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/trends${qs ? `?${qs}` : ''}`;
 
     return this.getJson<AstronautTrendsResponse>(url, () => {
       const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
@@ -507,13 +515,49 @@ class ApiClient {
         });
       }
 
-      const list: TrendObservation[] = DEMO_TRENDS[astronautId] || [];
+      let list: TrendObservation[] = DEMO_TRENDS[astronautId] || [];
+      if (params?.context) {
+        list = list.filter((t) => t.context === params.context);
+      }
       return {
         astronaut_id: astronautId,
         evaluated_at: new Date().toISOString(),
         data: list,
         total: list.length,
       };
+    });
+  }
+
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/trends/{measurement_type}
+   */
+  public async getMetricTrend(
+    astronautId: string,
+    measurementType: string,
+    params?: { context?: string; exercise_modality?: string; lookback_hours?: number }
+  ): Promise<TrendObservation> {
+    const query = new URLSearchParams();
+    if (params?.context) query.set('context', params.context);
+    if (params?.exercise_modality) query.set('exercise_modality', params.exercise_modality);
+    if (params?.lookback_hours) query.set('lookback_hours', String(params.lookback_hours));
+
+    const qs = query.toString();
+    const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/trends/${encodeURIComponent(measurementType)}${qs ? `?${qs}` : ''}`;
+
+    return this.getJson<TrendObservation>(url, () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      const list: TrendObservation[] = DEMO_TRENDS[astronautId] || [];
+      const match = list.find((t) => t.measurement_type === measurementType || t.canonical_identifier === measurementType);
+      if (!match) {
+        throw new ApiError(404, `No trend observation found for metric '${measurementType}'.`, 'TREND_NOT_FOUND');
+      }
+      return match;
     });
   }
 
@@ -589,6 +633,21 @@ class ApiClient {
         data: assessments.slice(0, limit),
         total: assessments.length,
       };
+    });
+  }
+
+  /**
+   * GET /api/v1/assessments/{assessment_id}
+   */
+  public async getAssessmentById(assessmentId: string): Promise<AssessmentResponse> {
+    const url = `${BASE_URL}/assessments/${encodeURIComponent(assessmentId)}`;
+
+    return this.getJson<AssessmentResponse>(url, () => {
+      for (const list of Object.values(DEMO_ASSESSMENTS)) {
+        const found = list.find((a) => a.id === assessmentId);
+        if (found) return found;
+      }
+      throw new ApiError(404, `Assessment with id '${assessmentId}' not found.`, 'ASSESSMENT_NOT_FOUND');
     });
   }
 
@@ -683,6 +742,21 @@ class ApiClient {
         data: filtered,
         total: filtered.length,
       };
+    });
+  }
+
+  /**
+   * GET /api/v1/alerts/{alert_id}
+   */
+  public async getAlertById(alertId: string): Promise<AlertResponse> {
+    const url = `${BASE_URL}/alerts/${encodeURIComponent(alertId)}`;
+
+    return this.getJson<AlertResponse>(url, () => {
+      const found = (DEMO_ALERTS || []).find((a) => a.id === alertId);
+      if (!found) {
+        throw new ApiError(404, `Alert with id '${alertId}' not found.`, 'ALERT_NOT_FOUND');
+      }
+      return found;
     });
   }
 

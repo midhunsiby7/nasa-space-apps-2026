@@ -24,6 +24,8 @@ interface LayoutProps {
   onOpenNonAnatomical?: () => void;
   onToggleDemoGuide?: () => void;
   isDemoGuideOpen?: boolean;
+  onOpenCommandPalette?: () => void;
+  onOpenEvidenceReport?: () => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -45,6 +47,8 @@ export const Layout: React.FC<LayoutProps> = ({
   onOpenNonAnatomical,
   onToggleDemoGuide,
   isDemoGuideOpen = false,
+  onOpenCommandPalette,
+  onOpenEvidenceReport,
 }) => {
   return (
     <div className="flex min-h-screen flex-col bg-space-950 text-space-100">
@@ -56,6 +60,8 @@ export const Layout: React.FC<LayoutProps> = ({
         onRetryConnection={onRetryConnection}
         onToggleDemoMode={onToggleDemoMode}
         isDemoMode={isDemoMode}
+        onOpenCommandPalette={onOpenCommandPalette}
+        onOpenEvidenceReport={onOpenEvidenceReport}
       />
       <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
         <Sidebar

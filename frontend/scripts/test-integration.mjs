@@ -645,6 +645,94 @@ async function runTests() {
       '42. Anatomy Registry integrity: All regions defined with strict NASA-STD-3001 guardrails; ocular/musculoskeletal continuous telemetry flagged unavailable; non-anatomical drawer preserved'
     );
 
+    // --- PHASE 5: MISSION INTELLIGENCE & PREMIUM OPERATIONS SUITE ---
+    console.log('\n--- EXECUTING PHASE 5 MISSION INTELLIGENCE & PREMIUM OPERATIONS SUITE ---');
+
+    // 43. Single Alert Lookup: GET /alerts/{alert_id}
+    const singleAlertRes = await fetch(`${BASE_URL}/alerts/${targetAlert.id}`);
+    const singleAlertJson = await singleAlertRes.json();
+    assert(
+      singleAlertRes.status === 200 && singleAlertJson.id === targetAlert.id && singleAlertJson.severity,
+      '43. Alert detail inspection: GET /alerts/{id} retrieves complete operational alert record'
+    );
+
+    // 44. Single Assessment Lookup: GET /assessments/{assessment_id}
+    const latestAsmLookupRes = await fetch(`${BASE_URL}/astronauts/astro-001/assessments/latest`);
+    const latestAsmLookupJson = await latestAsmLookupRes.json();
+    const singleAsmRes = await fetch(`${BASE_URL}/assessments/${latestAsmLookupJson.id}`);
+    const singleAsmJson = await singleAsmRes.json();
+    assert(
+      singleAsmRes.status === 200 && singleAsmJson.id === latestAsmLookupJson.id && Array.isArray(singleAsmJson.findings),
+      '44. Explainable assessment lookup: GET /assessments/{id} retrieves complete clinical decision support record'
+    );
+
+    // 45. Assessment History Listing: GET /astronauts/{id}/assessments
+    const asmListRes = await fetch(`${BASE_URL}/astronauts/astro-001/assessments?limit=10`);
+    const asmListJson = await asmListRes.json();
+    assert(
+      asmListRes.status === 200 && Array.isArray(asmListJson.data) && asmListJson.total >= 1,
+      '45. Assessment history: GET /astronauts/{id}/assessments retrieves historical assessment records'
+    );
+
+    // 46. Parameterized Trends Query: context and lookback_hours
+    const paramTrendRes = await fetch(`${BASE_URL}/astronauts/astro-001/trends?context=resting_cabin&lookback_hours=72`);
+    const paramTrendJson = await paramTrendRes.json();
+    assert(
+      paramTrendRes.status === 200 &&
+        Array.isArray(paramTrendJson.data) &&
+        paramTrendJson.data.every((t) => t.context === 'resting_cabin'),
+      '46. Parameterized trend evaluation: GET /trends with context=resting_cabin & lookback_hours=72 isolates resting cohort'
+    );
+
+    // 47. Scientific Slope Unit Integrity: Sen's slope must be per 24 hours
+    const trendCardSource = fs.readFileSync(
+      path.resolve(__dirname, '../src/components/trend/TrendTrajectoryCard.tsx'),
+      'utf8'
+    );
+    const hasSensSlope24h =
+      trendCardSource.includes("Sen's Slope (24h)") && trendCardSource.includes('{trend.unit}/24h');
+    assert(
+      hasSensSlope24h,
+      "47. Scientific slope unit integrity: TrendTrajectoryCard strictly displays Sen's slope in units per 24 hours"
+    );
+
+    // 48. Reconstructed Mission Timeline File & Contract Verification
+    const timelineSource = fs.readFileSync(
+      path.resolve(__dirname, '../src/components/timeline/MissionTimeline.tsx'),
+      'utf8'
+    );
+    const hasTimelineDisclosure = timelineSource.includes('Reconstructed Application Timeline');
+    const separatesOccurrenceTime =
+      timelineSource.includes('occurrenceTime') && timelineSource.includes('ingestionTime');
+    assert(
+      hasTimelineDisclosure && separatesOccurrenceTime,
+      '48. Reconstructed Mission Timeline: Discloses reconstructed status and separates occurrence from ingestion time'
+    );
+
+    // 49. Command Palette & Operator Keyboard Shortcuts
+    const commandPaletteSource = fs.readFileSync(
+      path.resolve(__dirname, '../src/components/navigation/CommandPalette.tsx'),
+      'utf8'
+    );
+    const appSource = fs.readFileSync(path.resolve(__dirname, '../src/App.tsx'), 'utf8');
+    const hasCtrlK = appSource.includes("key.toLowerCase() === 'k'") && commandPaletteSource.includes('CommandPaletteProps');
+    assert(
+      hasCtrlK,
+      '49. Premium operator workflow: Global Ctrl+K Command Palette registered and wired across views, crew, and metrics'
+    );
+
+    // 50. Evidence Report Synthesis & Non-Diagnostic Disclosure
+    const reportSource = fs.readFileSync(
+      path.resolve(__dirname, '../src/components/reports/EvidenceReportModal.tsx'),
+      'utf8'
+    );
+    const hasReportDisclosure = reportSource.includes('COSMOLOOKUP algorithms do NOT constitute an automated medical diagnosis');
+    const hasMarkdownExport = reportSource.includes('handleCopyMarkdown') && reportSource.includes('handlePrint');
+    assert(
+      hasReportDisclosure && hasMarkdownExport,
+      '50. Evidence Report: Mandatory non-diagnostic disclosure, Markdown export, and print formatting verified'
+    );
+
     console.log(`\n========================================`);
     console.log(`INTEGRATION RESULTS: ${passed} Passed, ${failed} Failed`);
     console.log(`========================================`);

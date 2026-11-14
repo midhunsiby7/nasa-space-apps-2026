@@ -93,15 +93,15 @@ export const ANATOMICAL_REGIONS: Record<AnatomicalRegionId, AnatomicalRegionDefi
     system: 'Central Nervous System & Vestibular Balance',
     description: 'Neurocranium, cerebral compartments, vestibular inner ear apparatus, and sensorimotor balance.',
     scientificRationale:
-      'Tracks neurovestibular space motion adaptation and circadian sleep architecture. Peripheral capillary SpO2 is provided as a general oxygenation reference proxy.',
-    telemetryKeys: ['sleep_duration', 'spo2'],
+      'Evaluates neurovestibular space motion adaptation and sensorimotor balance. Sleep duration and sleep staging are non-anatomical operational metrics tracked in the Non-Anatomical Habitat Drawer, NOT mapped to cranial brain tissue. Peripheral pulse oximetry reflects systemic capillary saturation, NOT intracranial parenchymal tissue oxygenation.',
+    telemetryKeys: [],
     meshIds: ['mesh_cranium', 'mesh_brain', 'mesh_vestibular'],
     color: '#06b6d4', // cyan
     cameraTarget: [0, 1.35, 0],
     cameraPosition: [0, 1.4, 2.2],
-    isContinuousTelemetryAvailable: true,
-    notes: 'Scientific Guardrail: Peripheral SpO2 reflects systemic capillary saturation, NOT intracranial parenchymal tissue oxygenation.',
-    clinicalProtocolNotice: 'Sensorimotor coordination and motion sickness are tracked through subjective crew reports and sleep staging algorithms.',
+    isContinuousTelemetryAvailable: false,
+    notes: 'Scientific Guardrail: Sleep architecture is tracked via non-anatomical telemetry channels. SpO2 is peripheral oxygen saturation and mapped under Pulmonary/Respiratory gas exchange. Peripheral SpO2 reflects systemic capillary saturation, NOT intracranial parenchymal tissue oxygenation.',
+    clinicalProtocolNotice: 'Sensorimotor coordination and motion sickness are tracked through scheduled operational protocols and subjective crew reports.',
   },
 
   thermoregulation: {
@@ -117,7 +117,7 @@ export const ANATOMICAL_REGIONS: Record<AnatomicalRegionId, AnatomicalRegionDefi
     cameraTarget: [0, -0.05, 0],
     cameraPosition: [0, -0.05, 2.6],
     isContinuousTelemetryAvailable: true,
-    notes: 'Acquired telemetrically from an ingestible radio-frequency thermal sensor capsule in the GI tract.',
+    notes: 'Acquired telemetrically from an ingestible radio-frequency thermal sensor capsule in the GI tract or dermal sensors.',
     clinicalProtocolNotice: 'Post-exercise recovery kinetics reflect thermoregulatory countermeasure efficacy.',
   },
 
@@ -127,14 +127,14 @@ export const ANATOMICAL_REGIONS: Record<AnatomicalRegionId, AnatomicalRegionDefi
     system: 'Pulmonary Ventilation & Gas Exchange',
     description: 'Bilateral lung lobes, bronchial arborization, and alveolar gas exchange.',
     scientificRationale:
-      'Respiratory rate measures thoracic expansion cadence. Arterial oxygen saturation (SpO2) reflects effective capillary oxygen delivery.',
+      'Respiratory rate measures thoracic expansion cadence. Arterial oxygen saturation (SpO2) measures peripheral oxygen saturation by pulse oximetry.',
     telemetryKeys: ['respiratory_rate', 'spo2'],
     meshIds: ['mesh_lung_l', 'mesh_lung_r', 'mesh_trachea'],
     color: '#10b981', // emerald
     cameraTarget: [0, 0.5, 0],
     cameraPosition: [0, 0.55, 2.6],
     isContinuousTelemetryAvailable: true,
-    notes: 'BioHarness acoustic/impedance respiratory sensors coupled with optical pulse oximetry.',
+    notes: 'Respiratory impedance sensors coupled with peripheral pulse oximetry (SpO2). SpO2 measures peripheral oxygen saturation by pulse oximetry.',
     clinicalProtocolNotice: 'Monitors microgravity pulmonary ventilation-perfusion matching and atmospheric scrub efficiency.',
   },
 };
