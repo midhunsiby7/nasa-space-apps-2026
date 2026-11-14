@@ -62,3 +62,7 @@ class AssessmentGenerationRequest(BaseModel):
         None,
         description="Optional explicitly configured protocol limits. Emergency evaluation is disabled by default.",
     )
+    reported_symptoms: Optional[List[str]] = Field(
+        None,
+        description="Optional list of crew-reported subjective symptoms (e.g. ['headache', 'dizziness', 'acute_chest_pain'])",
+    )

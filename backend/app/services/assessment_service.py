@@ -39,6 +39,16 @@ DEMO_UNVALIDATED_EMERGENCY_THRESHOLDS: Dict[str, Dict[str, float]] = {
 }
 
 
+# Critical Acute / Emergency Symptom Set for Decision Support Escalation
+ACUTE_EMERGENCY_SYMPTOMS = {
+    "acute_chest_pain",
+    "sudden_visual_loss",
+    "severe_dyspnea",
+    "loss_of_consciousness",
+    "acute_severe_headache",
+}
+
+
 def evaluate_metric_finding(
     trend: TrendObservation,
     emergency_protocol_config: Optional[Dict[str, Dict[str, float]]] = None,
@@ -47,10 +57,31 @@ def evaluate_metric_finding(
 
     Emergency evaluation is DISABLED by default unless an explicit protocol configuration
     is provided via `emergency_protocol_config`. Unvalidated thresholds must never be presented
-    as genuine medical emergency determinations.
+    as genuine medical emergency determinations. Missing or insufficient data must NEVER imply
+    nominal physiology.
     """
-    status = "nominal"
-    summary = f"{trend.measurement_type}: Operating within nominal intra-individual variation."
+    # 0. Check data availability and currency first
+    if trend.sample_count == 0:
+        status = "no_data"
+        summary = (
+            f"No telemetry observations recorded for {trend.measurement_type} in lookback window. "
+            f"Absence of telemetry does NOT indicate nominal physiology."
+        )
+    elif trend.trend_direction == "insufficient_data":
+        status = "insufficient_data"
+        summary = (
+            f"{trend.measurement_type}: Insufficient data ({trend.sample_count} observation(s) in lookback window; "
+            f"minimum 3 required for trajectory analysis). Does NOT confirm nominal physiology."
+        )
+    elif trend.freshness_status == "stale":
+        status = "telemetry_stale"
+        summary = (
+            f"{trend.measurement_type} telemetry is stale ({trend.hours_since_last_observation}h since last reading; "
+            f"expected every {trend.expected_interval_hours}h). Currency verification required."
+        )
+    else:
+        status = "nominal"
+        summary = f"{trend.measurement_type}: Operating within nominal intra-individual variation."
 
     # 1. Configured emergency rule check (DISABLED by default unless emergency_protocol_config is provided)
     if emergency_protocol_config and trend.current_value is not None:
@@ -85,8 +116,8 @@ def evaluate_metric_finding(
                 f"This notification is a decision-support indicator based on configured protocol rules and does NOT constitute a clinical diagnosis."
             )
 
-    # 2. Non-emergency status evaluation
-    if status != "emergency":
+    # 2. Non-emergency status evaluation for available data
+    if status not in ("emergency", "no_data", "insufficient_data"):
         if trend.is_sustained:
             status = "sustained_shift"
             summary = (
@@ -201,6 +232,7 @@ def synthesize_health_assessment(
     lookback_hours: int = 72,
     generate_alerts: bool = True,
     emergency_protocol_config: Optional[Dict[str, Dict[str, float]]] = None,
+    reported_symptoms: Optional[List[str]] = None,
 ) -> HealthAssessment:
     """Execute end-to-end explainable assessment synthesizing trends, baselines, and safety rules."""
     astronaut = get_astronaut(db=db, astronaut_id=astronaut_id)
@@ -244,18 +276,38 @@ def synthesize_health_assessment(
         elif st == "significant_outlier":
             significant_deviations.append(t.measurement_type)
 
-    # 3. Concordance & Attention Classification
-    # Rules:
-    # - emergency: Explicitly configured protocol threshold triggered (disabled by default).
-    # - medical_review_recommended: Multiple sustained shifts (e.g. HR + temp) OR 1 sustained shift + 1 significant outlier.
-    # - needs_attention: 1 sustained shift OR 2+ significant outliers.
-    # - routine: Nominal or isolated single outlier.
+    # 3. Concordance & Attention Classification with Clinical Primacy
+    acute_symptoms = [
+        s for s in (reported_symptoms or [])
+        if s.lower().replace(" ", "_") in ACUTE_EMERGENCY_SYMPTOMS
+    ]
+    general_symptoms = [
+        s for s in (reported_symptoms or [])
+        if s.lower().replace(" ", "_") not in ACUTE_EMERGENCY_SYMPTOMS
+    ]
+
+    active_stream_trends = [t for t in trends if t.sample_count > 0]
+    has_active_streams = len(active_stream_trends) > 0
+    all_active_streams_stale = has_active_streams and all(
+        t.freshness_status == "stale" for t in active_stream_trends
+    )
+    if not has_active_streams or all_active_streams_stale:
+        has_degraded = True
+
     if emergency_detected:
         overall_classification = "emergency"
         explanation = (
             f"OPERATIONAL PROTOCOL NOTICE: Telemetry excursion in {', '.join(emergency_metrics)} "
             f"met explicitly configured threshold criteria. This notification is an operational "
             f"decision-support indicator and not an automated clinical diagnosis."
+        )
+    elif acute_symptoms:
+        # Acute/emergency symptom report takes clinical precedence over statistical telemetry
+        overall_classification = "medical_review_recommended"
+        explanation = (
+            f"CLINICAL PRIMACY / ACUTE SYMPTOM ESCALATION: Astronaut reported acute symptom(s) ({', '.join(acute_symptoms)}). "
+            f"Statistical vital envelopes cannot dismiss direct crew symptom reports. Immediate flight surgeon consultation "
+            f"and operational checklist review required. Does NOT constitute automated clinical diagnosis."
         )
     elif len(sustained_shifts) >= 2 or (len(sustained_shifts) >= 1 and len(significant_deviations) >= 1):
         overall_classification = "medical_review_recommended"
@@ -271,6 +323,20 @@ def synthesize_health_assessment(
             f"Sustained baseline shift detected in {', '.join(affected)} relative to personal {context} operational baseline. "
             f"Observation is based on consecutive readings in lookback window ({lookback_hours}h). Does not indicate pathology."
         )
+    elif general_symptoms:
+        # Clinical primacy: symptoms reported despite normal vitals
+        overall_classification = "needs_attention"
+        explanation = (
+            f"CLINICAL PRIMACY NOTICE: Astronaut reported subjective symptom(s) ({', '.join(general_symptoms)}). "
+            f"Although statistical telemetry remains within personal baseline envelopes, reported symptoms take clinical precedence "
+            f"and require non-diagnostic medical review."
+        )
+    elif not has_active_streams or all_active_streams_stale:
+        overall_classification = "routine"
+        explanation = (
+            f"Telemetry streams across monitored metrics in context '{context}' are missing or stale. "
+            f"Intra-individual baseline stability cannot be verified without current sensor packets. Telemetry currency verification required."
+        )
     else:
         overall_classification = "routine"
         explanation = (
@@ -280,6 +346,15 @@ def synthesize_health_assessment(
 
     # 4. Generate safe deterministic guidance
     guidance = generate_safe_guidance(overall_classification, findings)
+    if reported_symptoms:
+        guidance.append(
+            GuidanceItem(
+                category="clinical_primacy",
+                action="Review reported subjective symptoms with the astronaut. Never dismiss symptoms based solely on statistical vital envelopes.",
+                rationale="Direct crew subjective reports take clinical precedence over automated non-invasive telemetry models.",
+                is_medical_prescription=False,
+            )
+        )
 
     # 5. Persist HealthAssessment
     assessment_id = f"asm-{uuid.uuid4().hex[:12]}"

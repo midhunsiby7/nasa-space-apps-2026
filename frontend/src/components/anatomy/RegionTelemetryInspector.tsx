@@ -484,12 +484,13 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
             {region.id === 'ocular' && (
               <div className="space-y-2 text-space-300 text-[11px] leading-relaxed">
                 <p>
-                  <strong>Spaceflight-Associated Neuro-ocular Syndrome (SANS):</strong> Monitored every 30 days
-                  in-flight via bilateral Optical Coherence Tomography (OCT) scans, dilated funduscopic imaging,
-                  and Snellen visual acuity charts on the Columbus/Destiny module.
+                  <strong>Spaceflight-Associated Neuro-ocular Syndrome (SANS):</strong> In-flight surveillance
+                  follows scheduled periodic diagnostic imaging protocols (e.g., illustrative 30-to-60 day cadence per
+                  NASA Spaceflight Standard Measures protocol; specific schedule defined by mission flight rules) via
+                  bilateral Optical Coherence Tomography (OCT) scans, dilated funduscopic imaging, and visual acuity charts.
                 </p>
                 <p className="text-space-400 italic">
-                  Data provenance: Periodic ophthalmology packets are transmitted to Ground Flight Surgeons at Johnson Space Center (JSC).
+                  Data provenance: Periodic ophthalmology imaging packets are transmitted to Ground Flight Surgeons at Johnson Space Center (JSC).
                 </p>
               </div>
             )}
@@ -497,8 +498,10 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
             {region.id === 'musculoskeletal' && (
               <div className="space-y-2 text-space-300 text-[11px] leading-relaxed">
                 <p>
-                  <strong>Axial Skeleton & Muscle Mass Preservation:</strong> Managed through mandatory 2.5 hours/day
-                  resistive exercise on ARED (Advanced Resistive Exercise Device) and cyclic loading on the T2 Treadmill.
+                  <strong>Axial Skeleton & Muscle Mass Preservation:</strong> Managed under NASA flight rules allocating
+                  2.5 hours total daily exercise time, comprising ~60–90 minutes of dedicated resistive loading on ARED
+                  (Advanced Resistive Exercise Device), ~30–45 minutes of aerobic conditioning on the T2 Treadmill or
+                  CEVIS cycle ergometer, plus setup and personal hygiene.
                 </p>
                 <p className="text-space-400 italic">
                   Bone mineral density (BMD) is formally evaluated via pre-flight and post-flight dual-energy X-ray absorptiometry (DXA).
@@ -507,8 +510,8 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
             )}
 
             <div className="pt-2 border-t border-space-800 flex items-center justify-between text-[10px] text-space-400">
-              <span>Ground Flight Surgeon Protocol ID: NASA-STD-3001</span>
-              <span className="text-telemetry-cyan">Nominal Schedule Active</span>
+              <span>Flight Protocol Standard: NASA-STD-3001 & Standard Measures</span>
+              <span className="text-telemetry-cyan">Protocol Schedule Active</span>
             </div>
           </div>
         </div>
