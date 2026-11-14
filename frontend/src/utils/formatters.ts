@@ -12,68 +12,76 @@ export interface MetricMeta {
 }
 
 export const METRIC_METADATA: Record<string, MetricMeta> = {
-  // Authoritative seeded backend metrics
   heart_rate: {
     type: 'heart_rate',
     label: 'Heart Rate',
     shortLabel: 'HR',
     unit: 'bpm',
-    color: '#f43f5e', // rose
+    color: '#f43f5e',
     description: 'Autonomous cardiovascular rate captured via telemetry array',
     nominalRange: '60 – 100 bpm (rest baseline)',
   },
   spo2: {
     type: 'spo2',
+    label: 'Oxygen Saturation (SpO2)',
+    shortLabel: 'SpO2',
+    unit: '%',
+    color: '#38bdf8',
+    description: 'Peripheral capillary oxygen saturation via pulse oximetry',
+    nominalRange: '95.0% – 100.0%',
+  },
+  blood_oxygen: {
+    type: 'blood_oxygen',
     label: 'Blood Oxygen (SpO2)',
     shortLabel: 'SpO2',
     unit: '%',
-    color: '#38bdf8', // cyan
+    color: '#38bdf8',
     description: 'Peripheral arterial capillary oxygen saturation via pulse oximetry',
     nominalRange: '95.0% – 100.0%',
+  },
+  respiratory_rate: {
+    type: 'respiratory_rate',
+    label: 'Respiratory Rate',
+    shortLabel: 'RESP',
+    unit: 'breaths/min',
+    color: '#10b981',
+    description: 'Thoracic ventilation cadence and expansion cycles',
+    nominalRange: '12 – 20 breaths/min',
   },
   body_temperature: {
     type: 'body_temperature',
     label: 'Body Temperature',
-    shortLabel: 'Core Temp',
+    shortLabel: 'Body Temp',
     unit: '°C',
-    color: '#f59e0b', // amber
-    description: 'Internal core thermoregulatory reading via ingestible capsule sensor',
-    nominalRange: '36.5 – 37.5 °C',
+    color: '#f59e0b',
+    description: 'Skin / peripheral thermometry telemetry',
+    nominalRange: '36.0 – 37.2 °C',
   },
   core_temperature: {
     type: 'core_temperature',
     label: 'Core Body Temperature',
     shortLabel: 'Core Temp',
     unit: '°C',
-    color: '#f59e0b', // amber
+    color: '#f59e0b',
     description: 'Deep visceral thermoregulatory reading via ingestible core telemetry',
     nominalRange: '36.5 – 37.5 °C',
-  },
-  respiratory_rate: {
-    type: 'respiratory_rate',
-    label: 'Respiratory Rate',
-    shortLabel: 'Resp',
-    unit: 'breaths/min',
-    color: '#10b981', // emerald
-    description: 'Pulmonary ventilation frequency (breathing cycles per minute)',
-    nominalRange: '12 – 20 breaths/min',
   },
   blood_pressure_systolic: {
     type: 'blood_pressure_systolic',
     label: 'Systolic Blood Pressure',
-    shortLabel: 'BP Sys',
+    shortLabel: 'SBP',
     unit: 'mmHg',
-    color: '#a855f7', // violet
-    description: 'Peak arterial pressure during ventricular contraction phase',
+    color: '#fb7185',
+    description: 'Peak aortic vascular ejection pressure during ventricular contraction',
     nominalRange: '90 – 120 mmHg',
   },
   blood_pressure_diastolic: {
     type: 'blood_pressure_diastolic',
     label: 'Diastolic Blood Pressure',
-    shortLabel: 'BP Dia',
+    shortLabel: 'DBP',
     unit: 'mmHg',
-    color: '#8b5cf6', // purple
-    description: 'Minimum arterial pressure during ventricular relaxation phase',
+    color: '#fda4af',
+    description: 'Resting arterial vascular pressure during ventricular relaxation',
     nominalRange: '60 – 80 mmHg',
   },
   mean_arterial_pressure: {
@@ -81,7 +89,7 @@ export const METRIC_METADATA: Record<string, MetricMeta> = {
     label: 'Mean Arterial Pressure (MAP)',
     shortLabel: 'MAP',
     unit: 'mmHg',
-    color: '#c084fc', // purple-400
+    color: '#c084fc',
     description: 'Derived average arterial hemodynamic pressure throughout one cardiac cycle',
     nominalRange: '70 – 105 mmHg',
   },
@@ -90,27 +98,18 @@ export const METRIC_METADATA: Record<string, MetricMeta> = {
     label: 'Sleep Duration',
     shortLabel: 'Sleep',
     unit: 'hours',
-    color: '#6366f1', // indigo
-    description: 'Consolidated circadian rest period staging',
-    nominalRange: '7.0 – 9.0 hours',
+    color: '#818cf8',
+    description: 'Circadian rest period duration from sleep stage telemetry',
+    nominalRange: '7.0 – 8.5 hours',
   },
   radiation_dose: {
     type: 'radiation_dose',
     label: 'Radiation Exposure',
     shortLabel: 'Rad Dose',
     unit: 'mSv',
-    color: '#ec4899', // pink
+    color: '#ec4899',
     description: 'Dosimetric ionizing cosmic radiation cumulative exposure',
     nominalRange: 'Varies with habitat shielding & solar weather',
-  },
-  blood_oxygen: {
-    type: 'blood_oxygen',
-    label: 'Blood Oxygen (SpO2)',
-    shortLabel: 'SpO2',
-    unit: '%',
-    color: '#38bdf8',
-    description: 'Peripheral arterial oxygen saturation via pulse oximetry',
-    nominalRange: '95.0% – 100.0%',
   },
 };
 
