@@ -19,6 +19,25 @@ from app.schemas.baseline import (
     BaselineResponse,
     BaselineListResponse,
     BaselineCalculationRequest,
+    PreflightFinalizationRequest,
+)
+from app.schemas.trend import (
+    TrendObservation,
+    AstronautTrendsResponse,
+    MetricFreshnessItem,
+    TelemetryFreshnessResponse,
+)
+from app.schemas.assessment import (
+    AssessmentFinding,
+    GuidanceItem,
+    AssessmentResponse,
+    AssessmentListResponse,
+    AssessmentGenerationRequest,
+)
+from app.schemas.alert import (
+    AlertResponse,
+    AlertListResponse,
+    AlertActionRequest,
 )
 
 __all__ = [
@@ -37,4 +56,17 @@ __all__ = [
     "BaselineResponse",
     "BaselineListResponse",
     "BaselineCalculationRequest",
+    "PreflightFinalizationRequest",
+    "TrendObservation",
+    "AstronautTrendsResponse",
+    "MetricFreshnessItem",
+    "TelemetryFreshnessResponse",
+    "AssessmentFinding",
+    "GuidanceItem",
+    "AssessmentResponse",
+    "AssessmentListResponse",
+    "AssessmentGenerationRequest",
+    "AlertResponse",
+    "AlertListResponse",
+    "AlertActionRequest",
 ]

@@ -97,3 +97,43 @@ class InsufficientMeasurementsException(AppException):
                 "context": context,
             },
         )
+
+
+class PreflightBaselineFinalizedException(AppException):
+    """Raised when an attempt is made to mutate or overwrite a finalized preflight baseline."""
+
+    def __init__(self, baseline_id: str, message: Optional[str] = None):
+        msg = message or (
+            f"Preflight baseline '{baseline_id}' has been finalized and is immutable. "
+            f"Finalized preflight benchmarks cannot be modified in place."
+        )
+        super().__init__(
+            code="PREFLIGHT_BASELINE_FINALIZED",
+            message=msg,
+            status_code=409,
+            details={"baseline_id": baseline_id},
+        )
+
+
+class AssessmentNotFoundException(AppException):
+    """Raised when a health assessment does not exist."""
+
+    def __init__(self, assessment_id: str):
+        super().__init__(
+            code="ASSESSMENT_NOT_FOUND",
+            message=f"Health assessment with id '{assessment_id}' not found.",
+            status_code=404,
+            details={"assessment_id": assessment_id},
+        )
+
+
+class AlertNotFoundException(AppException):
+    """Raised when a health alert does not exist."""
+
+    def __init__(self, alert_id: str):
+        super().__init__(
+            code="ALERT_NOT_FOUND",
+            message=f"Health alert with id '{alert_id}' not found.",
+            status_code=404,
+            details={"alert_id": alert_id},
+        )

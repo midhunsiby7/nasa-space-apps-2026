@@ -15,6 +15,9 @@ COSMOLOOKUP organizes telemetry and derived reference baselines around individua
 erDiagram
     ASTRONAUT ||--o{ MEASUREMENT : "has"
     ASTRONAUT ||--o{ ASTRONAUT_BASELINE : "has"
+    ASTRONAUT ||--o{ HEALTH_ASSESSMENT : "has"
+    ASTRONAUT ||--o{ HEALTH_ALERT : "has"
+    HEALTH_ASSESSMENT ||--o{ HEALTH_ALERT : "emits"
 
     ASTRONAUT {
         string id PK "Unique astronaut identifier"
@@ -48,6 +51,12 @@ erDiagram
         string astronaut_id FK "References Astronaut(id)"
         string measurement_type "Canonical metric identifier"
         string context "Physiological context partition"
+        string baseline_type "Cohort type (preflight | inflight)"
+        string maturity "Maturity status (insufficient | provisional | established)"
+        integer version "Version lineage number"
+        boolean is_active "Active reference indicator"
+        boolean is_finalized "Immutable finalized preflight flag"
+        string supersedes_baseline_id "Prior superseded baseline ID"
         string exercise_modality "Exercise equipment modality"
         string measurement_site "Anatomical observation site"
         string measurement_method "Protocol / technique"
@@ -67,9 +76,39 @@ erDiagram
         integer degraded_count "Count of degraded measurements"
         timestamp window_start "Earliest measurement timestamp"
         timestamp window_end "Latest measurement timestamp"
-        string algorithm_version "Engine version (v2b-iqr)"
+        string algorithm_version "Engine version (v2c-lifecycle)"
         boolean is_synthetic "Provenance flag"
         timestamp calculated_at "Timestamp of baseline generation"
+    }
+
+    HEALTH_ASSESSMENT {
+        string id PK "Unique assessment identifier"
+        string astronaut_id FK "References Astronaut(id)"
+        timestamp assessment_date "Evaluation timestamp"
+        string overall_classification "Attention tier (routine | needs_attention | medical_review_recommended | emergency)"
+        string summary_explanation "Transparent observational explanation"
+        string findings_json "Metric findings JSON payload"
+        string guidance_json "Deterministic safe guidance JSON"
+        string baseline_versions_json "Baseline versions utilized mapping"
+        string data_quality_status "Fidelity rating across lookback window"
+        boolean is_synthetic "Provenance flag"
+        timestamp created_at "Record creation timestamp"
+    }
+
+    HEALTH_ALERT {
+        string id PK "Unique alert identifier"
+        string astronaut_id FK "References Astronaut(id)"
+        string assessment_id FK "Optional reference to originating HealthAssessment"
+        string measurement_type "Target metric"
+        string category "Alert category"
+        string severity "Severity tier (low | medium | high | critical)"
+        string title "Concise alert headline"
+        string explanation "Non-diagnostic explanation"
+        string status "Alert state (active | acknowledged | resolved)"
+        timestamp created_at "Alert creation timestamp"
+        timestamp acknowledged_at "Review acknowledgment timestamp"
+        timestamp resolved_at "Resolution timestamp"
+        boolean is_synthetic "Provenance flag"
     }
 ```
 
@@ -147,6 +186,14 @@ Represents a calculated personal physiological baseline envelope for an individu
 | `q25` | `REAL` | No | — | First quartile (25th percentile). |
 | `q75` | `REAL` | No | — | Third quartile (75th percentile). |
 | `iqr` | `REAL` | No | — | Interquartile range ($Q_3 - Q_1$, primary non-parametric scale estimator). |
+| `baseline_type` | `VARCHAR(32)` | No | `'inflight'` | Cohort classification (`'preflight'` or `'inflight'`). |
+| `maturity` | `VARCHAR(32)` | No | `'insufficient'` | Maturity status (`'insufficient'`, `'provisional'`, `'established'`). |
+| `version` | `INTEGER` | No | `1` | Sequential version lineage number. |
+| `is_active` | `BOOLEAN` | No | `TRUE` | Whether this record is the active baseline reference. |
+| `is_finalized` | `BOOLEAN` | No | `FALSE` | Whether this preflight baseline is locked and immutable. |
+| `supersedes_baseline_id` | `VARCHAR(64)` | Yes | `NULL` | Prior baseline identifier superseded by this version. |
+| `maturity_evaluated_at` | `TIMESTAMP WITH TIME ZONE` | Yes | `NULL` | Timestamp of last maturity assessment. |
+| `maturity_criteria_snapshot` | `TEXT` | Yes | `NULL` | JSON snapshot of sample count and days evaluated. |
 | `mean` | `REAL` | No | — | Sample mean (secondary descriptive statistic). |
 | `std_dev` | `REAL` | No | — | Sample standard deviation (secondary descriptive statistic). |
 | `robust_scale_iqr` | `REAL` | No | — | Gaussian-equivalent robust scale estimate ($\text{IQR} / 1.349$). |
@@ -157,14 +204,67 @@ Represents a calculated personal physiological baseline envelope for an individu
 | `degraded_count` | `INTEGER` | No | `0` | Count of non-nominal (degraded/noisy) measurements evaluated. |
 | `window_start` | `TIMESTAMP WITH TIME ZONE` | Yes | `NULL` | Earliest measurement timestamp in cohort. |
 | `window_end` | `TIMESTAMP WITH TIME ZONE` | Yes | `NULL` | Latest measurement timestamp in cohort. |
-| `algorithm_version` | `VARCHAR(32)` | No | `'v2b-iqr'` | Baseline calculation algorithm identifier. |
+| `algorithm_version` | `VARCHAR(32)` | No | `'v2c-lifecycle'` | Baseline calculation algorithm identifier. |
 | `is_synthetic` | `BOOLEAN` | No | `TRUE` | Synthetic provenance indicator. |
 | `calculated_at` | `TIMESTAMP WITH TIME ZONE` | No | `CURRENT_TIMESTAMP` | UTC timestamp of baseline calculation. |
 
 #### Indices
 - `pk_astronaut_baseline`: Primary index on `id`.
 - `idx_baseline_astronaut`: Index on `astronaut_id`.
-- `idx_baseline_lookup`: Composite index on `(astronaut_id, measurement_type, context)` for logarithmic baseline retrieval.
+- `idx_baseline_lookup`: Composite index on `(astronaut_id, measurement_type, context)`.
+- `idx_baseline_active`: Composite index on `(astronaut_id, baseline_type, measurement_type, is_active)`.
+
+---
+
+### 2.4. `HealthAssessment`
+
+Stores multi-metric diagnostic support evaluations synthesizing intra-individual trends, active baseline references, and deterministic decision rules.
+
+| Column | Data Type | Nullable | Default | Constraints & Description |
+|---|---|---|---|---|
+| `id` | `VARCHAR(64)` | No | — | **Primary Key**. Unique assessment identifier (e.g., `"asm-81f72a"`). |
+| `astronaut_id` | `VARCHAR(64)` | No | — | **Foreign Key** referencing `astronaut(id)`. |
+| `assessment_date` | `TIMESTAMP WITH TIME ZONE` | No | `CURRENT_TIMESTAMP` | Timestamp of assessment generation. |
+| `overall_classification` | `VARCHAR(32)` | No | — | Attention classification tier (`'routine'`, `'needs_attention'`, `'medical_review_recommended'`, `'emergency'`). |
+| `summary_explanation` | `TEXT` | No | — | Structured, natural-language explanation of findings. |
+| `findings_json` | `TEXT` | No | `'[]'` | JSON payload of per-metric findings. |
+| `guidance_json` | `TEXT` | No | `'[]'` | JSON payload of deterministic non-diagnostic guidance items. |
+| `baseline_versions_json` | `TEXT` | No | `'{}'` | JSON mapping of metric types to baseline versions used. |
+| `data_quality_status` | `VARCHAR(32)` | No | `'nominal'` | Overall quality across lookback window. |
+| `is_synthetic` | `BOOLEAN` | No | `TRUE` | Provenance flag. |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No | `CURRENT_TIMESTAMP` | UTC record creation timestamp. |
+
+#### Indices
+- `pk_health_assessment`: Primary index on `id`.
+- `idx_assessment_astronaut`: Index on `astronaut_id`.
+- `idx_assessment_timeline`: Composite index on `(astronaut_id, assessment_date DESC)`.
+
+---
+
+### 2.5. `HealthAlert`
+
+Represents operational health alerts requiring operator review or medical officer action.
+
+| Column | Data Type | Nullable | Default | Constraints & Description |
+|---|---|---|---|---|
+| `id` | `VARCHAR(64)` | No | — | **Primary Key**. Unique alert identifier (e.g., `"alt-b901fc"`). |
+| `astronaut_id` | `VARCHAR(64)` | No | — | **Foreign Key** referencing `astronaut(id)`. |
+| `assessment_id` | `VARCHAR(64)` | Yes | `NULL` | Optional **Foreign Key** referencing originating `health_assessment(id)`. |
+| `measurement_type` | `VARCHAR(64)` | No | — | Metric classification related to alert. |
+| `category` | `VARCHAR(64)` | No | — | Alert category (`'physiological_shift'`, `'data_staleness'`, etc.). |
+| `severity` | `VARCHAR(32)` | No | `'medium'` | Severity tier (`'low'`, `'medium'`, `'high'`, `'critical'`). |
+| `title` | `VARCHAR(255)` | No | — | Concise headline summary. |
+| `explanation` | `TEXT` | No | — | Transparent non-diagnostic explanation. |
+| `status` | `VARCHAR(32)` | No | `'active'` | Alert state (`'active'`, `'acknowledged'`, `'resolved'`). |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | No | `CURRENT_TIMESTAMP` | UTC creation timestamp. |
+| `acknowledged_at` | `TIMESTAMP WITH TIME ZONE` | Yes | `NULL` | Timestamp when operator acknowledged alert. |
+| `resolved_at` | `TIMESTAMP WITH TIME ZONE` | Yes | `NULL` | Timestamp when alert was marked resolved. |
+| `is_synthetic` | `BOOLEAN` | No | `TRUE` | Provenance flag. |
+
+#### Indices
+- `pk_health_alert`: Primary index on `id`.
+- `idx_alert_astronaut`: Index on `astronaut_id`.
+- `idx_alert_status`: Composite index on `(astronaut_id, status)`.
 
 ---
 
@@ -214,6 +314,14 @@ CREATE TABLE astronaut_baseline (
     astronaut_id VARCHAR(64) NOT NULL,
     measurement_type VARCHAR(64) NOT NULL,
     context VARCHAR(64) NOT NULL DEFAULT 'resting_cabin',
+    baseline_type VARCHAR(32) NOT NULL DEFAULT 'inflight',
+    maturity VARCHAR(32) NOT NULL DEFAULT 'insufficient',
+    version INTEGER NOT NULL DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    is_finalized BOOLEAN NOT NULL DEFAULT 0,
+    supersedes_baseline_id VARCHAR(64),
+    maturity_evaluated_at TIMESTAMP WITH TIME ZONE,
+    maturity_criteria_snapshot TEXT,
     exercise_modality VARCHAR(64),
     measurement_site VARCHAR(64),
     measurement_method VARCHAR(64),
@@ -233,14 +341,65 @@ CREATE TABLE astronaut_baseline (
     degraded_count INTEGER NOT NULL DEFAULT 0,
     window_start TIMESTAMP WITH TIME ZONE,
     window_end TIMESTAMP WITH TIME ZONE,
-    algorithm_version VARCHAR(32) NOT NULL DEFAULT 'v2b-iqr',
+    algorithm_version VARCHAR(32) NOT NULL DEFAULT 'v2c-lifecycle',
     is_synthetic BOOLEAN NOT NULL DEFAULT 1,
     calculated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_baseline_astronaut FOREIGN KEY (astronaut_id)
         REFERENCES astronaut(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT chk_baseline_context CHECK (context IN ('resting_cabin', 'sleep_cycle', 'exercise_active', 'exercise_recovery'))
+    CONSTRAINT chk_baseline_context CHECK (context IN ('resting_cabin', 'sleep_cycle', 'exercise_active', 'exercise_recovery')),
+    CONSTRAINT chk_baseline_type CHECK (baseline_type IN ('preflight', 'inflight')),
+    CONSTRAINT chk_baseline_maturity CHECK (maturity IN ('insufficient', 'provisional', 'established'))
 );
 
 CREATE INDEX idx_baseline_astronaut ON astronaut_baseline(astronaut_id);
 CREATE INDEX idx_baseline_lookup ON astronaut_baseline(astronaut_id, measurement_type, context);
+CREATE INDEX idx_baseline_active ON astronaut_baseline(astronaut_id, baseline_type, measurement_type, is_active);
+
+-- Table: health_assessment
+CREATE TABLE health_assessment (
+    id VARCHAR(64) PRIMARY KEY,
+    astronaut_id VARCHAR(64) NOT NULL,
+    assessment_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    overall_classification VARCHAR(32) NOT NULL,
+    summary_explanation TEXT NOT NULL,
+    findings_json TEXT NOT NULL DEFAULT '[]',
+    guidance_json TEXT NOT NULL DEFAULT '[]',
+    baseline_versions_json TEXT NOT NULL DEFAULT '{}',
+    data_quality_status VARCHAR(32) NOT NULL DEFAULT 'nominal',
+    is_synthetic BOOLEAN NOT NULL DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_assessment_astronaut FOREIGN KEY (astronaut_id)
+        REFERENCES astronaut(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT chk_assessment_classification CHECK (overall_classification IN ('routine', 'needs_attention', 'medical_review_recommended', 'emergency'))
+);
+
+CREATE INDEX idx_assessment_astronaut ON health_assessment(astronaut_id);
+CREATE INDEX idx_assessment_timeline ON health_assessment(astronaut_id, assessment_date DESC);
+
+-- Table: health_alert
+CREATE TABLE health_alert (
+    id VARCHAR(64) PRIMARY KEY,
+    astronaut_id VARCHAR(64) NOT NULL,
+    assessment_id VARCHAR(64),
+    measurement_type VARCHAR(64) NOT NULL,
+    category VARCHAR(64) NOT NULL,
+    severity VARCHAR(32) NOT NULL DEFAULT 'medium',
+    title VARCHAR(255) NOT NULL,
+    explanation TEXT NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    acknowledged_at TIMESTAMP WITH TIME ZONE,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    is_synthetic BOOLEAN NOT NULL DEFAULT 1,
+    CONSTRAINT fk_alert_astronaut FOREIGN KEY (astronaut_id)
+        REFERENCES astronaut(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_alert_assessment FOREIGN KEY (assessment_id)
+        REFERENCES health_assessment(id) ON DELETE SET NULL,
+    CONSTRAINT chk_alert_severity CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+    CONSTRAINT chk_alert_status CHECK (status IN ('active', 'acknowledged', 'resolved'))
+);
+
+CREATE INDEX idx_alert_astronaut ON health_alert(astronaut_id);
+CREATE INDEX idx_alert_status ON health_alert(astronaut_id, status);
+```
 ```

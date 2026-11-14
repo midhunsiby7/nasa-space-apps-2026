@@ -392,3 +392,325 @@ Returns the individual `BaselineResponse` JSON object matching the specification
   }
 }
 ```
+
+---
+
+### 7. Calculate Preflight Baseline
+
+Calculates and registers a preflight benchmark baseline for an astronaut. Sets `baseline_type = 'preflight'`.
+
+- **Method:** `POST`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/preflight`
+- **Payload:** Same as `POST /api/v1/astronauts/{astronaut_id}/baselines/calculate`
+
+#### Response: `200 OK`
+Returns `BaselineResponse` with `baseline_type: "preflight"` and `is_finalized: false`.
+
+#### Response: `409 Conflict`
+If preflight baseline is already finalized:
+```json
+{
+  "error": {
+    "code": "PREFLIGHT_BASELINE_FINALIZED",
+    "message": "Preflight baseline 'base-123' for metric 'heart_rate' has been finalized and is immutable.",
+    "details": {
+      "baseline_id": "base-123"
+    }
+  }
+}
+```
+
+---
+
+### 8. Finalize Preflight Baseline
+
+Locks an existing preflight baseline against future modifications.
+
+- **Method:** `POST`
+- **Route:** `/api/v1/baselines/{baseline_id}/finalize`
+- **Payload:**
+```json
+{
+  "reason": "Flight Surgeon approved baseline dataset."
+}
+```
+
+#### Response: `200 OK`
+Returns `BaselineResponse` with `is_finalized: true`.
+
+---
+
+### 9. Get Active Baselines
+
+Retrieves all currently active baseline references for an astronaut.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/active`
+- **Query Parameters:** `baseline_type` (optional), `context` (optional)
+
+#### Response: `200 OK`
+Returns `BaselineListResponse` containing active records.
+
+---
+
+### 10. Get Baseline Version History
+
+Retrieves historical baseline versions for auditability and evolution tracking.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/{measurement_type}/history`
+- **Query Parameters:** `baseline_type` (optional), `context` (optional)
+
+#### Response: `200 OK`
+Returns `BaselineListResponse` in descending version order.
+
+---
+
+### 11. Astronaut Telemetry Trends
+
+Retrieves intra-individual trend analysis across all monitored metrics for an astronaut.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/trends`
+- **Query Parameters:** `context` (default: `resting_cabin`), `lookback_hours` (default: `72`)
+
+#### Response: `200 OK`
+```json
+{
+  "astronaut_id": "astro-001",
+  "evaluated_at": "2026-11-14T12:00:00Z",
+  "data": [
+    {
+      "measurement_type": "heart_rate",
+      "canonical_identifier": "heart_rate",
+      "context": "resting_cabin",
+      "exercise_modality": null,
+      "unit": "bpm",
+      "current_value": 72.0,
+      "current_measured_at": "2026-11-14T11:45:00Z",
+      "baseline_id": "base-4f18a2bc",
+      "baseline_version": 1,
+      "baseline_type": "inflight",
+      "baseline_maturity": "established",
+      "baseline_median": 70.0,
+      "baseline_iqr": 4.0,
+      "robust_scale_iqr": 2.9652,
+      "robust_z": 0.67,
+      "sample_count": 24,
+      "sens_slope": 0.45,
+      "trend_direction": "stable",
+      "consecutive_deviations": 0,
+      "is_sustained": false,
+      "freshness_status": "fresh",
+      "hours_since_last_observation": 0.25,
+      "expected_interval_hours": 6.0,
+      "data_quality_status": "nominal",
+      "explanation": "Stable physiological trajectory within expected operational variation (|Z| <= 1.5, Sen's slope ~ 0.0)."
+    }
+  ],
+  "total": 9
+}
+```
+
+---
+
+### 12. Telemetry Freshness Report
+
+Evaluates telemetry currency and staleness report across all monitored metrics.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/trends/freshness`
+
+#### Response: `200 OK`
+```json
+{
+  "astronaut_id": "astro-001",
+  "evaluated_at": "2026-11-14T12:00:00Z",
+  "items": [
+    {
+      "measurement_type": "heart_rate",
+      "last_measured_at": "2026-11-14T11:45:00Z",
+      "hours_since_last": 0.25,
+      "expected_interval_hours": 6.0,
+      "status": "fresh",
+      "message": "Telemetry is current (updated 0.2h ago; expected <= 6.0h)."
+    }
+  ],
+  "stale_count": 0,
+  "total_metrics": 9
+}
+```
+
+---
+
+### 13. Single Metric Trend
+
+Evaluates trajectory, Sen's slope rate-of-change, and deviation for an individual metric.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/trends/{measurement_type}`
+- **Query Parameters:** `context` (default: `resting_cabin`), `exercise_modality` (optional), `lookback_hours` (default: `72`)
+
+#### Response: `200 OK`
+Returns `TrendObservation` JSON schema.
+
+---
+
+### 14. Generate Explainable Health Assessment
+
+Synthesizes multi-metric trend analysis, concordance rules, and deterministic safe guidance.
+
+- **Method:** `POST`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/assessments`
+- **Payload:**
+```json
+{
+  "context": "resting_cabin",
+  "lookback_hours": 72,
+  "generate_alerts": true
+}
+```
+
+#### Response: `200 OK`
+```json
+{
+  "id": "asm-81f72a",
+  "astronaut_id": "astro-001",
+  "assessment_date": "2026-11-14T12:00:00Z",
+  "overall_classification": "routine",
+  "summary_explanation": "Astronaut physiological telemetry is operating within nominal personal baseline envelopes for context 'resting_cabin'. No sustained deviations or multi-parameter shifts detected across lookback window.",
+  "findings": [
+    {
+      "measurement_type": "heart_rate",
+      "status": "nominal",
+      "summary": "heart_rate: Operating within nominal intra-individual variation.",
+      "current_value": 72.0,
+      "baseline_median": 70.0,
+      "robust_z": 0.67,
+      "trend": "stable",
+      "baseline_version": 1
+    }
+  ],
+  "guidance": [
+    {
+      "category": "telemetry_schedule",
+      "action": "Maintain scheduled routine telemetry collection intervals.",
+      "rationale": "All monitored vitals are operating within established intra-individual baselines.",
+      "is_medical_prescription": false
+    }
+  ],
+  "baseline_versions_used": {
+    "heart_rate": "base-4f18a2bc (v1)"
+  },
+  "data_quality_status": "nominal",
+  "is_synthetic": true,
+  "created_at": "2026-11-14T12:00:00Z"
+}
+```
+
+---
+
+### 15. Get Latest Health Assessment
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/assessments/latest`
+
+#### Response: `200 OK`
+Returns the most recent `AssessmentResponse`.
+
+---
+
+### 16. List Historical Health Assessments
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/assessments`
+- **Query Parameters:** `limit` (default: `50`, max: `100`)
+
+#### Response: `200 OK`
+Returns `AssessmentListResponse`.
+
+---
+
+### 17. Get Single Assessment
+
+- **Method:** `GET`
+- **Route:** `/api/v1/assessments/{assessment_id}`
+
+#### Response: `200 OK`
+Returns `AssessmentResponse`.
+
+---
+
+### 18. List Health Alerts
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/alerts`
+- **Query Parameters:** `status` (`active`, `acknowledged`, `resolved`), `severity` (`low`, `medium`, `high`, `critical`)
+
+#### Response: `200 OK`
+```json
+{
+  "astronaut_id": "astro-001",
+  "data": [
+    {
+      "id": "alt-b901fc",
+      "astronaut_id": "astro-001",
+      "assessment_id": "asm-81f72a",
+      "measurement_type": "heart_rate",
+      "category": "physiological_shift",
+      "severity": "medium",
+      "title": "Heart Rate Needs Attention",
+      "explanation": "Sustained baseline shift detected in heart_rate relative to personal resting_cabin operational baseline.",
+      "status": "active",
+      "created_at": "2026-11-14T12:00:00Z",
+      "acknowledged_at": null,
+      "resolved_at": null,
+      "is_synthetic": true
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### 19. Get Single Alert
+
+- **Method:** `GET`
+- **Route:** `/api/v1/alerts/{alert_id}`
+
+#### Response: `200 OK`
+Returns `AlertResponse`.
+
+---
+
+### 20. Acknowledge Alert
+
+- **Method:** `POST`
+- **Route:** `/api/v1/alerts/{alert_id}/acknowledge`
+- **Payload:**
+```json
+{
+  "note": "Operator acknowledged telemetry excursion; observing next collection cycle."
+}
+```
+
+#### Response: `200 OK`
+Returns updated `AlertResponse` with `status: "acknowledged"` and timestamp.
+
+---
+
+### 21. Resolve Alert
+
+- **Method:** `POST`
+- **Route:** `/api/v1/alerts/{alert_id}/resolve`
+- **Payload:**
+```json
+{
+  "note": "Follow-up measurement returned to nominal envelope."
+}
+```
+
+#### Response: `200 OK`
+Returns updated `AlertResponse` with `status: "resolved"` and timestamp.
+

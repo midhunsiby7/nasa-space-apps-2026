@@ -231,6 +231,17 @@ def calculate_and_persist_baseline(
     window_end = max(timestamps) if timestamps else None
     is_synthetic = any(m.is_synthetic for m in valid_records)
 
+    # Evaluate maturity
+    from app.services.baseline_lifecycle_service import evaluate_baseline_maturity
+    import json
+    maturity, snapshot = evaluate_baseline_maturity(
+        sample_count=len(normalized_values),
+        window_start=window_start,
+        window_end=window_end,
+        nominal_count=nominal_count,
+        degraded_count=degraded_count,
+    )
+
     # 9. Upsert baseline record
     existing_query = (
         select(AstronautBaseline)
@@ -257,6 +268,14 @@ def calculate_and_persist_baseline(
 
     now_utc = datetime.now(timezone.utc)
     if baseline:
+        # Check preflight finalization immutability
+        if baseline.baseline_type == "preflight" and baseline.is_finalized:
+            from app.core.exceptions import PreflightBaselineFinalizedException
+            raise PreflightBaselineFinalizedException(
+                baseline_id=baseline.id,
+                message=f"Preflight baseline '{baseline.id}' is finalized and immutable.",
+            )
+
         # Update existing record
         baseline.unit = catalog_entry.standard_unit
         baseline.median = stats["median"]
@@ -273,6 +292,9 @@ def calculate_and_persist_baseline(
         baseline.degraded_count = degraded_count
         baseline.window_start = window_start
         baseline.window_end = window_end
+        baseline.maturity = maturity
+        baseline.maturity_evaluated_at = now_utc
+        baseline.maturity_criteria_snapshot = json.dumps(snapshot)
         baseline.is_synthetic = is_synthetic
         baseline.calculated_at = now_utc
     else:
@@ -287,6 +309,14 @@ def calculate_and_persist_baseline(
             measurement_method=norm_method,
             sensor_model=catalog_entry.hardware_examples[0] if catalog_entry.hardware_examples else None,
             unit=catalog_entry.standard_unit,
+            baseline_type="inflight",
+            maturity=maturity,
+            version=1,
+            is_active=True,
+            is_finalized=False,
+            supersedes_baseline_id=None,
+            maturity_evaluated_at=now_utc,
+            maturity_criteria_snapshot=json.dumps(snapshot),
             median=stats["median"],
             q25=stats["q25"],
             q75=stats["q75"],
@@ -301,7 +331,7 @@ def calculate_and_persist_baseline(
             degraded_count=degraded_count,
             window_start=window_start,
             window_end=window_end,
-            algorithm_version="v2b-iqr",
+            algorithm_version="v2c-lifecycle",
             is_synthetic=is_synthetic,
             calculated_at=now_utc,
         )
@@ -399,6 +429,14 @@ def format_baseline_response(baseline: AstronautBaseline) -> BaselineResponse:
         measurement_method=baseline.measurement_method,
         sensor_model=baseline.sensor_model,
         unit=baseline.unit,
+        baseline_type=getattr(baseline, "baseline_type", "inflight"),
+        maturity=getattr(baseline, "maturity", "insufficient"),
+        version=getattr(baseline, "version", 1),
+        is_active=getattr(baseline, "is_active", True),
+        is_finalized=getattr(baseline, "is_finalized", False),
+        supersedes_baseline_id=getattr(baseline, "supersedes_baseline_id", None),
+        maturity_evaluated_at=_format_iso(getattr(baseline, "maturity_evaluated_at", None)),
+        maturity_criteria_snapshot=getattr(baseline, "maturity_criteria_snapshot", None),
         envelope=envelope,
         quality_summary=quality_summary,
         algorithm_version=baseline.algorithm_version,
