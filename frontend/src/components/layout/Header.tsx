@@ -139,9 +139,22 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Connection status badges */}
           {connectionState === 'connected' && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
-              <span className="font-semibold">API CONNECTED</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span className="font-semibold">API CONNECTED</span>
+              </div>
+              {onToggleDemoMode && (
+                <button
+                  onClick={onToggleDemoMode}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-space-850 hover:bg-space-800 border border-space-700 text-[11px] font-mono text-space-300 hover:text-amber-300 transition-colors"
+                  title="Switch to offline demonstration dataset (Demo Mode)"
+                  aria-label="Toggle Demonstration Mode"
+                >
+                  <PlayCircle className="h-3 w-3 text-amber-400" />
+                  <span>Demo Mode</span>
+                </button>
+              )}
             </div>
           )}
 

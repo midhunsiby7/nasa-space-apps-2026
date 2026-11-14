@@ -102,6 +102,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       { id: 'baselines', label: 'Personal Baselines', icon: <TrendingUp className="h-4 w-4 text-emerald-400" /> },
       { id: 'catalog', label: 'Measurement Catalog', icon: <BookOpen className="h-4 w-4 text-sky-400" /> },
       { id: 'roster', label: 'Crew Directory', icon: <Users className="h-4 w-4 text-space-300" /> },
+      { id: 'research', label: 'NASA OSDR Research Catalogue', icon: <BookOpen className="h-4 w-4 text-emerald-400" /> },
     ];
 
     views.forEach((v) => {

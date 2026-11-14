@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Activity,
+  BookOpen,
   AlertTriangle,
   TrendingUp,
   TrendingDown,
@@ -40,6 +41,7 @@ interface RegionTelemetryInspectorProps {
   onNavigateToChart: (metric: MeasurementType) => void;
   onNavigateToBaselines?: (metric: MeasurementType) => void;
   onNavigateToCatalog?: (metric: MeasurementType) => void;
+  onNavigateToResearch?: (bodySystem?: string) => void;
 }
 
 export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> = ({
@@ -55,6 +57,7 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
   onNavigateToChart,
   onNavigateToBaselines,
   onNavigateToCatalog,
+  onNavigateToResearch,
 }) => {
   const region = ANATOMICAL_REGIONS[regionId];
 
@@ -140,7 +143,18 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
             </p>
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            {onNavigateToResearch && (
+              <button
+                type="button"
+                onClick={() => onNavigateToResearch(region.id)}
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-950/40 hover:bg-sky-900/60 border border-sky-500/40 text-[10px] font-mono text-sky-300 transition-colors"
+                title={`Explore NASA OSDR research studies related to ${region.label}`}
+              >
+                <BookOpen className="h-3 w-3 text-sky-400" />
+                <span>Explore NASA OSDR Evidence</span>
+              </button>
+            )}
             {region.isContinuousTelemetryAvailable ? (
               <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-400 border border-emerald-500/30">
                 <CheckCircle2 className="h-3 w-3" />

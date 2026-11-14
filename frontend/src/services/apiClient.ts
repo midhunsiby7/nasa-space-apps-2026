@@ -34,6 +34,12 @@ import {
   HealthCheckResponse,
 } from '../types/api';
 import {
+  ResearchStudyResponse,
+  ResearchStudyListResponse,
+  ResearchSummaryResponse,
+  ListResearchStudiesParams,
+} from '../types/research';
+import {
   DEMO_ASTRONAUTS,
   DEMO_MEASUREMENTS,
   DEMO_CATALOG,
@@ -42,6 +48,8 @@ import {
   DEMO_FRESHNESS,
   DEMO_ASSESSMENTS,
   DEMO_ALERTS,
+  DEMO_RESEARCH_STUDIES,
+  DEMO_RESEARCH_SUMMARY,
 } from './demoData';
 
 export { ApiError };
@@ -776,6 +784,88 @@ class ApiClient {
   public async resolveAlert(alertId: string, note?: string): Promise<AlertResponse> {
     const url = `${BASE_URL}/alerts/${encodeURIComponent(alertId)}/resolve`;
     return this.postJson<AlertResponse, { note?: string }>(url, { note });
+  }
+/* =========================================================================
+   * 7. NASA OSDR RESEARCH CATALOGUE ENDPOINTS
+   * ========================================================================= */
+
+  /**
+   * GET /api/v1/research/summary
+   */
+  public async getResearchSummary(): Promise<ResearchSummaryResponse> {
+    const url = `${BASE_URL}/research/summary`;
+    return this.getJson<ResearchSummaryResponse>(url, () => DEMO_RESEARCH_SUMMARY);
+  }
+
+  /**
+   * GET /api/v1/research/studies
+   */
+  public async getResearchStudies(params?: ListResearchStudiesParams): Promise<ResearchStudyListResponse> {
+    const query = new URLSearchParams();
+    if (params?.body_system) query.set('body_system', params.body_system);
+    if (params?.evidence_category) query.set('evidence_category', params.evidence_category);
+    if (params?.relevance) query.set('relevance', params.relevance);
+    if (params?.search) query.set('search', params.search);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+
+    const qs = query.toString();
+    const url = `${BASE_URL}/research/studies${qs ? `?${qs}` : ''}`;
+
+    return this.getJson<ResearchStudyListResponse>(url, () => {
+      let filtered = [...DEMO_RESEARCH_STUDIES];
+      if (params?.body_system) {
+        const bs = params.body_system.toLowerCase();
+        filtered = filtered.filter((s) => s.body_systems.some((b) => b.toLowerCase() === bs));
+      }
+      if (params?.evidence_category) {
+        filtered = filtered.filter((s) => s.evidence_category === params.evidence_category);
+      }
+      if (params?.relevance) {
+        filtered = filtered.filter((s) => s.relevance === params.relevance);
+      }
+      if (params?.search) {
+        const q = params.search.toLowerCase().trim();
+        filtered = filtered.filter((s) =>
+          s.accession.toLowerCase().includes(q) ||
+          s.title.toLowerCase().includes(q) ||
+          s.description.toLowerCase().includes(q) ||
+          s.body_systems.some((b) => b.toLowerCase().includes(q)) ||
+          s.assay_types.some((a) => a.toLowerCase().includes(q))
+        );
+      }
+      const total = filtered.length;
+      const offset = params?.offset || 0;
+      const limit = params?.limit || 50;
+      return {
+        data: filtered.slice(offset, offset + limit),
+        total,
+        limit,
+        offset,
+      };
+    });
+  }
+
+  /**
+   * GET /api/v1/research/studies/{accession}
+   */
+  public async getResearchStudyByAccession(accession: string): Promise<ResearchStudyResponse> {
+    const url = `${BASE_URL}/research/studies/${encodeURIComponent(accession.trim())}`;
+
+    return this.getJson<ResearchStudyResponse>(url, () => {
+      const found = DEMO_RESEARCH_STUDIES.find(
+        (s) => s.accession.toUpperCase() === accession.trim().toUpperCase()
+      );
+      if (!found) {
+        throw new ApiError(
+          404,
+          `Research study with accession '${accession}' not found in catalogue.`,
+          'RESEARCH_STUDY_NOT_FOUND',
+          { accession }
+        );
+      }
+      return found;
+    });
   }
 }
 

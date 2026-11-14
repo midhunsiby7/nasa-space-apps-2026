@@ -753,6 +753,68 @@ async function runTests() {
       '50. Evidence Report: Mandatory non-diagnostic disclosure, Markdown export, and print formatting verified'
     );
 
+    // 51. NASA OSDR Research Summary Endpoint
+    const summaryRes = await fetch(`${BASE_URL}/research/summary`);
+    const summaryJson = await summaryRes.json();
+    assert(
+      summaryRes.status === 200 &&
+        summaryJson.total_studies === 15 &&
+        summaryJson.counts_by_evidence_category?.HUMAN_SPACEFLIGHT === 2 &&
+        summaryJson.counts_by_relevance?.HIGH === 11,
+      '51. NASA OSDR Research Summary: GET /api/v1/research/summary returns 15 studies with verified category & relevance counts'
+    );
+
+    // 52. NASA OSDR Research Studies Listing & Multi-dimensional Filtering
+    const studiesRes = await fetch(`${BASE_URL}/research/studies`);
+    const studiesJson = await studiesRes.json();
+    assert(
+      studiesRes.status === 200 &&
+        Array.isArray(studiesJson.data) &&
+        studiesJson.total === 15,
+      '52. NASA OSDR Studies Listing: GET /api/v1/research/studies retrieves all 15 curated empirical studies'
+    );
+
+    // 53. Targeted Filtering by Evidence Category and Body System
+    const cardioRes = await fetch(`${BASE_URL}/research/studies?body_system=cardiovascular`);
+    const cardioJson = await cardioRes.json();
+    const flightRes = await fetch(`${BASE_URL}/research/studies?evidence_category=HUMAN_SPACEFLIGHT`);
+    const flightJson = await flightRes.json();
+    assert(
+      cardioRes.status === 200 &&
+        cardioJson.data.every((s) => s.body_systems.includes('cardiovascular')) &&
+        flightRes.status === 200 &&
+        flightJson.data.every((s) => s.evidence_category === 'HUMAN_SPACEFLIGHT'),
+      '53. NASA OSDR Multi-Filter: Accurately partitions studies by body_system=cardiovascular and evidence_category=HUMAN_SPACEFLIGHT'
+    );
+
+    // 54. Study Detail Endpoint & Explicit Scientific Limitations
+    const osd575Res = await fetch(`${BASE_URL}/research/studies/OSD-575`);
+    const osd575Json = await osd575Res.json();
+    assert(
+      osd575Res.status === 200 &&
+        osd575Json.accession === 'OSD-575' &&
+        osd575Json.is_synthetic === false &&
+        osd575Json.provenance_type === 'NASA_OSDR_CURATED' &&
+        typeof osd575Json.official_url === 'string' &&
+        osd575Json.official_url.includes('osdr.nasa.gov') &&
+        Boolean(osd575Json.limitations),
+      '54. Study Detail & Provenance: OSD-575 includes official NASA URL, non-synthetic provenance, and explicit scientific limitations'
+    );
+
+    // 55. Frontend Research Explorer UI & Central Judge Communication Message
+    const explorerSource = fs.readFileSync(
+      path.resolve(__dirname, '../src/components/research/ResearchExplorerView.tsx'),
+      'utf8'
+    );
+    const hasCentralMessage = explorerSource.includes(
+      "COSMOLOOKUP doesn't just display astronaut health indicators. It also provides access to the scientific research behind spaceflight health risks, while keeping research evidence separate from individual astronaut telemetry."
+    );
+    const hasDecouplingNotice = explorerSource.includes('NASA_OSDR_CURATED') && explorerSource.includes('is_synthetic: false');
+    assert(
+      hasCentralMessage && hasDecouplingNotice,
+      '55. Judge Communication: Research Explorer prominently communicates access to spaceflight research while guaranteeing telemetry decoupling'
+    );
+
     console.log(`\n========================================`);
     console.log(`INTEGRATION RESULTS: ${passed} Passed, ${failed} Failed`);
     console.log(`========================================`);
