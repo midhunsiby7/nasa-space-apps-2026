@@ -8,7 +8,12 @@ actual astronaut medical records or official NASA clinical thresholds.
 
 from datetime import datetime, timezone, timedelta
 import math
+import os
 import sys
+
+# Ensure backend root is in sys.path when invoked directly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from sqlalchemy.orm import Session
 from app.database.connection import engine, SessionLocal
 from app.database.base import Base
