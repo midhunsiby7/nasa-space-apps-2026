@@ -7,11 +7,17 @@ import { ProvenanceNotice } from './components/dashboard/ProvenanceNotice';
 import { AstronautDirectory } from './components/astronaut/AstronautDirectory';
 import { AstronautProfileModal } from './components/astronaut/AstronautProfileModal';
 import { TelemetryStreamSection } from './components/telemetry/TelemetryStreamSection';
+import { HealthIntelligenceSection } from './components/intelligence/HealthIntelligenceSection';
+import { AlertsHub } from './components/alert/AlertsHub';
 import { AnatomyViewport } from './components/anatomy/AnatomyViewport';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ErrorMessage } from './components/common/ErrorMessage';
 import { Astronaut } from './types/astronaut';
 import { Measurement, MeasurementType } from './types/measurement';
+import { BaselineResponse } from './types/baseline';
+import { TrendObservation, TelemetryFreshnessResponse } from './types/trend';
+import { AssessmentResponse } from './types/assessment';
+import { AlertResponse } from './types/alert';
 import { ConnectionState } from './types/api';
 import { apiClient } from './services/apiClient';
 
@@ -26,11 +32,21 @@ export const App: React.FC = () => {
   const [selectedMetric, setSelectedMetric] = useState<MeasurementType>('heart_rate');
   const [timeFilter, setTimeFilter] = useState<'all' | '8h' | '24h'>('all');
 
-  // UI / Status State
+  // Intelligence & Alerts Data State
+  const [baselines, setBaselines] = useState<BaselineResponse[]>([]);
+  const [trends, setTrends] = useState<TrendObservation[]>([]);
+  const [freshness, setFreshness] = useState<TelemetryFreshnessResponse | null>(null);
+  const [latestAssessment, setLatestAssessment] = useState<AssessmentResponse | null>(null);
+  const [alerts, setAlerts] = useState<AlertResponse[]>([]);
+
+  // UI / Loading State
   const [isLoadingAstronauts, setIsLoadingAstronauts] = useState<boolean>(true);
   const [isLoadingMeasurements, setIsLoadingMeasurements] = useState<boolean>(false);
+  const [isLoadingIntelligence, setIsLoadingIntelligence] = useState<boolean>(false);
+  const [isEvaluatingAssessment, setIsEvaluatingAssessment] = useState<boolean>(false);
   const [astronautsError, setAstronautsError] = useState<string | null>(null);
   const [measurementsError, setMeasurementsError] = useState<string | null>(null);
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connected');
 
   // Modals
@@ -45,7 +61,7 @@ export const App: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // Fetch Astronauts List
+  // 1. Fetch Astronauts List
   const fetchAstronauts = useCallback(async () => {
     setIsLoadingAstronauts(true);
     setAstronautsError(null);
@@ -66,7 +82,7 @@ export const App: React.FC = () => {
     fetchAstronauts();
   }, [fetchAstronauts]);
 
-  // Fetch Measurements for Selected Astronaut
+  // 2. Fetch Measurements for Selected Astronaut
   const fetchMeasurements = useCallback(async (astronautId: string) => {
     setIsLoadingMeasurements(true);
     setMeasurementsError(null);
@@ -80,11 +96,82 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  // 3. Fetch Health Intelligence (Baselines, Trends, Freshness, Assessment)
+  const fetchIntelligence = useCallback(async (astronautId: string) => {
+    setIsLoadingIntelligence(true);
+    setIntelligenceError(null);
+    try {
+      const [baselinesRes, trendsRes, freshnessRes, assessmentRes, alertsRes] = await Promise.all([
+        apiClient.getActiveBaselines(astronautId),
+        apiClient.getTrends(astronautId),
+        apiClient.getFreshness(astronautId),
+        apiClient.getLatestAssessment(astronautId),
+        apiClient.getAlerts(astronautId),
+      ]);
+
+      setBaselines(baselinesRes.data);
+      setTrends(trendsRes.data);
+      setFreshness(freshnessRes);
+      setLatestAssessment(assessmentRes);
+      setAlerts(alertsRes.data);
+    } catch (err: any) {
+      console.warn('Error fetching health intelligence:', err);
+      setIntelligenceError(err?.message || 'Unable to retrieve complete health intelligence data.');
+    } finally {
+      setIsLoadingIntelligence(false);
+    }
+  }, []);
+
+  // Trigger data fetches on selected astronaut change
   useEffect(() => {
     if (selectedAstronautId) {
       fetchMeasurements(selectedAstronautId);
+      fetchIntelligence(selectedAstronautId);
     }
-  }, [selectedAstronautId, fetchMeasurements]);
+  }, [selectedAstronautId, fetchMeasurements, fetchIntelligence]);
+
+  // Alert Lifecycle Actions
+  const handleAcknowledgeAlert = async (alertId: string, note?: string) => {
+    try {
+      const updated = await apiClient.acknowledgeAlert(alertId, note);
+      setAlerts((prev) => prev.map((a) => (a.id === alertId ? updated : a)));
+    } catch (err) {
+      console.error('Failed to acknowledge alert:', err);
+    }
+  };
+
+  const handleResolveAlert = async (alertId: string, note?: string) => {
+    try {
+      const updated = await apiClient.resolveAlert(alertId, note);
+      setAlerts((prev) => prev.map((a) => (a.id === alertId ? updated : a)));
+    } catch (err) {
+      console.error('Failed to resolve alert:', err);
+    }
+  };
+
+  const handleRunAssessment = async () => {
+    if (!selectedAstronautId) return;
+    setIsEvaluatingAssessment(true);
+    try {
+      const newAssessment = await apiClient.generateAssessment(selectedAstronautId, {
+        context: 'resting_cabin',
+        lookback_hours: 72,
+        generate_alerts: true,
+      });
+      setLatestAssessment(newAssessment);
+      // Refresh alerts and trends
+      const [alertsRes, trendsRes] = await Promise.all([
+        apiClient.getAlerts(selectedAstronautId),
+        apiClient.getTrends(selectedAstronautId),
+      ]);
+      setAlerts(alertsRes.data);
+      setTrends(trendsRes.data);
+    } catch (err) {
+      console.error('Failed to generate health assessment:', err);
+    } finally {
+      setIsEvaluatingAssessment(false);
+    }
+  };
 
   // Selected astronaut record
   const selectedAstronaut = useMemo(() => {
@@ -113,6 +200,12 @@ export const App: React.FC = () => {
     return measurements.filter((m) => new Date(m.measured_at).getTime() >= threshold);
   }, [measurements, timeFilter]);
 
+  const activeAlertsCount = useMemo(() => {
+    return alerts.filter((a) => a.status === 'active').length;
+  }, [alerts]);
+
+  const staleCount = freshness ? freshness.stale_count : 0;
+
   return (
     <Layout
       activeTab={activeTab}
@@ -124,9 +217,10 @@ export const App: React.FC = () => {
       onSelectMetric={setSelectedMetric}
       connectionState={connectionState}
       onOpenProvenanceGuide={() => setIsProvenanceModalOpen(true)}
+      activeAlertsCount={activeAlertsCount}
     >
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Selected Astronaut Status Banner (shown on Telemetry and Anatomy views) */}
+        {/* Selected Astronaut Status Banner */}
         {selectedAstronaut && activeTab !== 'roster' && (
           <SelectedAstronautBanner
             astronaut={selectedAstronaut}
@@ -156,8 +250,13 @@ export const App: React.FC = () => {
                 astronauts={astronauts}
                 measurements={measurements}
                 selectedAstronaut={selectedAstronaut}
+                activeAlertsCount={activeAlertsCount}
+                staleTelemetryCount={staleCount}
+                latestAssessment={latestAssessment}
                 onExploreRoster={() => setActiveTab('roster')}
                 onViewTelemetry={() => setActiveTab('telemetry')}
+                onViewIntelligence={() => setActiveTab('intelligence')}
+                onViewAlerts={() => setActiveTab('alerts')}
                 onOpenAnatomy={() => setActiveTab('anatomy')}
               />
             )}
@@ -192,9 +291,35 @@ export const App: React.FC = () => {
                     onSelectMetric={setSelectedMetric}
                     timeFilter={timeFilter}
                     onTimeFilterChange={setTimeFilter}
+                    baselines={baselines}
+                    trends={trends}
                   />
                 )}
               </>
+            )}
+
+            {activeTab === 'intelligence' && (
+              <HealthIntelligenceSection
+                astronaut={selectedAstronaut}
+                baselines={baselines}
+                trends={trends}
+                freshness={freshness}
+                assessment={latestAssessment}
+                isLoading={isLoadingIntelligence}
+                error={intelligenceError}
+                onRefresh={() => selectedAstronautId && fetchIntelligence(selectedAstronautId)}
+                onRunAssessment={handleRunAssessment}
+                isEvaluating={isEvaluatingAssessment}
+              />
+            )}
+
+            {activeTab === 'alerts' && (
+              <AlertsHub
+                alerts={alerts}
+                onAcknowledgeAlert={handleAcknowledgeAlert}
+                onResolveAlert={handleResolveAlert}
+                isLoading={isLoadingIntelligence}
+              />
             )}
 
             {activeTab === 'anatomy' && (
