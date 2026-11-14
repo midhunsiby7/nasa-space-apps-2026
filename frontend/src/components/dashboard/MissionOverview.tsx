@@ -1,22 +1,26 @@
 import React from 'react';
 import {
+  Rocket,
+  ShieldCheck,
   Users,
   Activity,
+  TrendingUp,
+  BookOpen,
+  ArrowRight,
   Brain,
   Bell,
   Heart,
   Droplet,
   Thermometer,
   Zap,
-  TrendingUp,
   TrendingDown,
   Minus,
   AlertOctagon,
-  ArrowRight,
   UserCheck,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement, MeasurementType } from '../../types/measurement';
+import { ConnectionState } from '../../types/api';
 import { AssessmentResponse } from '../../types/assessment';
 import { BaselineResponse } from '../../types/baseline';
 import { TrendObservation, TelemetryFreshnessResponse } from '../../types/trend';
@@ -24,8 +28,11 @@ import { AlertResponse } from '../../types/alert';
 
 interface MissionOverviewProps {
   astronauts: Astronaut[];
+  totalAstronauts: number;
   measurements: Measurement[];
+  totalMeasurements: number;
   selectedAstronaut: Astronaut | null;
+  connectionState?: ConnectionState;
   activeAlertsCount?: number;
   staleTelemetryCount?: number;
   latestAssessment?: AssessmentResponse | null;
@@ -38,14 +45,19 @@ interface MissionOverviewProps {
   onViewIntelligence: () => void;
   onViewAlerts: () => void;
   onOpenAnatomy: () => void;
+  onOpenBaselines?: () => void;
+  onOpenCatalog?: () => void;
   onSelectAstronaut?: (id: string) => void;
   onSelectMetric?: (metric: MeasurementType) => void;
 }
 
 export const MissionOverview: React.FC<MissionOverviewProps> = ({
   astronauts,
+  totalAstronauts,
   measurements,
+  totalMeasurements,
   selectedAstronaut,
+  connectionState = 'connected',
   activeAlertsCount = 0,
   staleTelemetryCount = 0,
   latestAssessment = null,
@@ -58,14 +70,15 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
   onViewIntelligence,
   onViewAlerts,
   onOpenAnatomy,
+  onOpenBaselines,
+  onOpenCatalog,
   onSelectAstronaut,
   onSelectMetric,
 }) => {
-  // Aggregate unique missions
   const missions = Array.from(new Set(astronauts.map((a) => a.mission_name)));
-  const totalMeasurements = measurements.length;
+  const loadedCount = measurements.length;
   const syntheticCount = measurements.filter((m) => m.is_synthetic).length;
-  const empiricalCount = totalMeasurements - syntheticCount;
+  const empiricalCount = loadedCount - syntheticCount;
 
   // Selected astronaut active alerts
   const astronautAlerts = selectedAstronaut
@@ -131,24 +144,24 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. Top High-Level Mission KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* Monitored Crew */}
         <div
           onClick={onExploreRoster}
           className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card cursor-pointer hover:border-space-600 transition-colors"
         >
           <div className="flex items-center justify-between text-space-400">
-            <span className="font-mono text-xs uppercase tracking-wider">Monitored Crew</span>
+            <span className="font-mono text-xs uppercase tracking-wider">Active Crew</span>
             <Users className="h-4 w-4 text-telemetry-cyan" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="font-mono text-3xl font-bold text-space-100">
-              {astronauts.length}
+              {totalAstronauts}
             </span>
             <span className="text-xs text-space-400 font-mono">Astronauts</span>
           </div>
           <p className="mt-1 text-[11px] text-space-400 font-mono">
-            Across {missions.length} active deep-space missions
+            {missions.length > 0 ? `In mission ${missions.join(', ')}` : 'No mission records'}
           </p>
         </div>
 
@@ -225,9 +238,50 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
               <span className="text-telemetry-amber font-semibold">⚠️ {staleTelemetryCount} stream(s) stale</span>
             ) : (
               <span className="text-telemetry-emerald">
-                ● {empiricalCount} emp / {syntheticCount} syn {freshness ? `(${freshness.total_metrics - freshness.stale_count}/${freshness.total_metrics} fresh)` : ''}
+                ● {empiricalCount} emp / {syntheticCount} syn {freshness ? `(${freshness.total_metrics - freshness.stale_count}/${freshness.total_metrics} fresh)` : `(${loadedCount} loaded)`}
               </span>
             )}
+          </p>
+        </div>
+
+        {/* Provenance Ratio */}
+        <div className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card">
+          <div className="flex items-center justify-between text-space-400">
+            <span className="font-mono text-xs uppercase tracking-wider">Data Provenance</span>
+            <ShieldCheck className="h-4 w-4 text-telemetry-amber" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-mono text-3xl font-bold text-telemetry-amber">
+              {syntheticCount}
+            </span>
+            <span className="text-xs text-space-400 font-mono">Synthetic / {empiricalCount} Real</span>
+          </div>
+          <p className="mt-1 text-[11px] text-space-400 font-mono">
+            NASA Space Apps model telemetry
+          </p>
+        </div>
+
+        {/* Spacecraft Link */}
+        <div className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card">
+          <div className="flex items-center justify-between text-space-400">
+            <span className="font-mono text-xs uppercase tracking-wider">Backend Service</span>
+            <Rocket className="h-4 w-4 text-telemetry-cyan" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span
+              className={`font-mono text-xl font-bold uppercase ${
+                connectionState === 'connected'
+                  ? 'text-telemetry-emerald'
+                  : connectionState === 'offline_demo'
+                  ? 'text-telemetry-amber'
+                  : 'text-rose-400'
+              }`}
+            >
+              {connectionState.replace(/_/g, ' ')}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-space-400 font-mono">
+            FastAPI telemetry router active
           </p>
         </div>
       </div>
@@ -265,6 +319,24 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
                 <Activity className="h-3.5 w-3.5" />
                 <span>3D Anatomy</span>
               </button>
+              {onOpenBaselines && (
+                <button
+                  onClick={onOpenBaselines}
+                  className="px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-telemetry-emerald/40 text-xs font-mono text-telemetry-emerald transition-colors flex items-center gap-1.5"
+                >
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  <span>Baselines</span>
+                </button>
+              )}
+              {onOpenCatalog && (
+                <button
+                  onClick={onOpenCatalog}
+                  className="px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-purple-400/40 text-xs font-mono text-purple-300 transition-colors flex items-center gap-1.5"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Catalog</span>
+                </button>
+              )}
               <button
                 onClick={onViewIntelligence}
                 className="px-3 py-1.5 rounded bg-telemetry-cyan/20 hover:bg-telemetry-cyan/30 border border-telemetry-cyan/50 text-xs font-mono text-telemetry-cyan font-semibold transition-colors flex items-center gap-1.5"
@@ -284,9 +356,9 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
               const tr = trendMap[m.type];
 
               const currentVal = latest ? latest.value : null;
-              const medianVal = base ? base.envelope.median : null;
-              const q25 = base ? base.envelope.q25 : null;
-              const q75 = base ? base.envelope.q75 : null;
+              const medianVal = base?.envelope?.median ?? null;
+              const q25 = base?.envelope?.q25 ?? null;
+              const q75 = base?.envelope?.q75 ?? null;
 
               return (
                 <div
@@ -388,7 +460,58 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
         </div>
       )}
 
-      {/* 3. Deep-Space Missions Breakdown */}
+      {/* 3. Operational Modules Banner */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
+        <div
+          onClick={onViewTelemetry}
+          className="p-3 rounded-lg bg-space-850 border border-space-800 hover:border-space-700 cursor-pointer transition-all space-y-1 shadow-hud-sm"
+        >
+          <div className="flex items-center justify-between text-space-200 font-semibold">
+            <span className="flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5 text-telemetry-cyan" />
+              Telemetry Explorer
+            </span>
+            <ArrowRight className="h-3 w-3 text-space-500" />
+          </div>
+          <p className="text-[11px] text-space-400">
+            Filter by operational context, countermeasure modality, and time window.
+          </p>
+        </div>
+
+        <div
+          onClick={onOpenBaselines || onViewIntelligence}
+          className="p-3 rounded-lg bg-space-850 border border-space-800 hover:border-space-700 cursor-pointer transition-all space-y-1 shadow-hud-sm"
+        >
+          <div className="flex items-center justify-between text-space-200 font-semibold">
+            <span className="flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-telemetry-emerald" />
+              Personal Baselines
+            </span>
+            <ArrowRight className="h-3 w-3 text-space-500" />
+          </div>
+          <p className="text-[11px] text-space-400">
+            Inspect statistical operational reference envelopes (Median, IQR) and explainable comparisons.
+          </p>
+        </div>
+
+        <div
+          onClick={onOpenCatalog || onViewTelemetry}
+          className="p-3 rounded-lg bg-space-850 border border-space-800 hover:border-space-700 cursor-pointer transition-all space-y-1 shadow-hud-sm"
+        >
+          <div className="flex items-center justify-between text-space-200 font-semibold">
+            <span className="flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5 text-purple-400" />
+              Measurement Catalog
+            </span>
+            <ArrowRight className="h-3 w-3 text-space-500" />
+          </div>
+          <p className="text-[11px] text-space-400">
+            Canonical definitions, physical range guards, accepted wire aliases, and context taxonomy.
+          </p>
+        </div>
+      </div>
+
+      {/* 4. Deep-Space Missions Breakdown */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-space-400">
@@ -398,53 +521,61 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
             Click crew member to switch monitoring focus
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {missions.map((mission) => {
-            const crewInMission = astronauts.filter((a) => a.mission_name === mission);
-            return (
-              <div
-                key={mission}
-                className="rounded-lg bg-space-850/80 border border-space-700/70 p-4 hover:border-space-600 transition-colors"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-mono text-sm font-bold text-space-100">
-                    {mission}
-                  </span>
-                  <span className="rounded bg-space-800 px-2 py-0.5 text-[10px] font-mono text-space-300 border border-space-700">
-                    {crewInMission.length} CREW
-                  </span>
+        {missions.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {missions.map((mission) => {
+              const crewInMission = astronauts.filter((a) => a.mission_name === mission);
+              return (
+                <div
+                  key={mission}
+                  className="rounded-lg bg-space-850/80 border border-space-700/70 p-4 hover:border-space-600 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono text-sm font-bold text-space-100">
+                      {mission}
+                    </span>
+                    <span className="rounded bg-space-800 px-2 py-0.5 text-[10px] font-mono text-space-300 border border-space-700">
+                      {crewInMission.length} CREW
+                    </span>
+                  </div>
+                  <ul className="space-y-1.5 mt-3">
+                    {crewInMission.map((a) => {
+                      const isSelected = selectedAstronaut?.id === a.id;
+                      return (
+                        <li
+                          key={a.id}
+                          onClick={() => onSelectAstronaut && onSelectAstronaut(a.id)}
+                          className={`flex items-center justify-between text-xs font-mono p-1.5 rounded cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-space-800 text-telemetry-cyan border border-telemetry-cyan/30'
+                              : 'text-space-300 hover:bg-space-800/50 hover:text-space-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            {isSelected ? (
+                              <UserCheck className="h-3.5 w-3.5 text-telemetry-cyan shrink-0" />
+                            ) : (
+                              <span className="h-2 w-2 rounded-full bg-space-600 shrink-0" />
+                            )}
+                            <span className="truncate">{a.name}</span>
+                          </div>
+                          <span className="text-[11px] text-space-400 shrink-0">Day {a.mission_day}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-                <ul className="space-y-1.5 mt-3">
-                  {crewInMission.map((a) => {
-                    const isSelected = selectedAstronaut?.id === a.id;
-                    return (
-                      <li
-                        key={a.id}
-                        onClick={() => onSelectAstronaut && onSelectAstronaut(a.id)}
-                        className={`flex items-center justify-between text-xs font-mono p-1.5 rounded cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-space-800 text-telemetry-cyan border border-telemetry-cyan/30'
-                            : 'text-space-300 hover:bg-space-800/50 hover:text-space-100'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          {isSelected ? (
-                            <UserCheck className="h-3.5 w-3.5 text-telemetry-cyan shrink-0" />
-                          ) : (
-                            <span className="h-2 w-2 rounded-full bg-space-600 shrink-0" />
-                          )}
-                          <span className="truncate">{a.name}</span>
-                        </div>
-                        <span className="text-[11px] text-space-400 shrink-0">Day {a.mission_day}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-lg bg-space-850 p-6 text-center border border-dashed border-space-700 text-xs font-mono text-space-400">
+            No missions or astronaut records returned by backend.
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+export default MissionOverview;

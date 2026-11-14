@@ -17,7 +17,7 @@ interface BaselineCardProps {
 export const BaselineCard: React.FC<BaselineCardProps> = ({ baseline, onViewHistory }) => {
   const { envelope, quality_summary } = baseline;
 
-  const renderMaturityBadge = (maturity: BaselineMaturity) => {
+  const renderMaturityBadge = (maturity?: BaselineMaturity) => {
     switch (maturity) {
       case 'established':
         return (

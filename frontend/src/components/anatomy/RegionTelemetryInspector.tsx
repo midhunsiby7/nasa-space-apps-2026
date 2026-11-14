@@ -292,7 +292,7 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
               </div>
               {baseline && (
                 <span className="rounded bg-space-800 px-2 py-0.5 font-mono text-[10px] text-space-300 border border-space-700">
-                  {baseline.baseline_type.toUpperCase()} • v{baseline.version} • {baseline.maturity}
+                  {(baseline.baseline_type || 'inflight').toUpperCase()} • v{baseline.version || 1} • {baseline.maturity || 'provisional'}
                 </span>
               )}
             </div>

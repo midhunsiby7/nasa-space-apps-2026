@@ -37,6 +37,7 @@ interface AnatomyViewportProps {
   selectedMetric?: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   onSwitchToChart: () => void;
+  onNavigateToBaselines?: (metric: MeasurementType) => void;
 }
 
 export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({

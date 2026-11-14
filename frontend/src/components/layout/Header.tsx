@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Orbit, Activity, Radio, ShieldCheck, HelpCircle, Sparkles } from 'lucide-react';
+import {
+  Orbit,
+  Radio,
+  ShieldCheck,
+  HelpCircle,
+  Sparkles,
+  RefreshCw,
+  AlertCircle,
+  PlayCircle,
+} from 'lucide-react';
 import { ConnectionState } from '../../types/api';
 
 interface HeaderProps {
@@ -7,6 +16,9 @@ interface HeaderProps {
   onOpenProvenanceGuide: () => void;
   onToggleDemoGuide?: () => void;
   isDemoGuideOpen?: boolean;
+  onRetryConnection?: () => void;
+  onToggleDemoMode?: () => void;
+  isDemoMode?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,6 +26,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProvenanceGuide,
   onToggleDemoGuide,
   isDemoGuideOpen = false,
+  onRetryConnection,
+  onToggleDemoMode,
+  isDemoMode = false,
 }) => {
   const [utcTime, setUtcTime] = useState<string>('');
 
@@ -78,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Data Provenance Button */}
+          {/* Data Provenance Guide Button */}
           <button
             onClick={onOpenProvenanceGuide}
             aria-label="Inspect Data Provenance & Scientific Integrity Standard"
@@ -90,19 +105,77 @@ export const Header: React.FC<HeaderProps> = ({
             <HelpCircle className="h-3 w-3 text-space-500" />
           </button>
 
-          {/* Connection status badge */}
-          {connectionState === 'connected' ? (
+          {/* Connection status badges */}
+          {connectionState === 'connected' && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
               <span className="font-semibold">API CONNECTED</span>
             </div>
-          ) : (
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono"
-              title="Operating with synthetic demonstration telemetry according to API Contract v1.0"
-            >
-              <Activity className="h-3.5 w-3.5 text-amber-400" />
-              <span>OFFLINE DEMO MODE</span>
+          )}
+
+          {connectionState === 'connecting' && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-mono">
+              <RefreshCw className="h-3 w-3 animate-spin text-sky-400" />
+              <span>CONNECTING...</span>
+            </div>
+          )}
+
+          {connectionState === 'offline' && (
+            <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-mono"
+                title="FastAPI backend service is offline at http://localhost:8000/api/v1"
+              >
+                <AlertCircle className="h-3.5 w-3.5 text-rose-400" />
+                <span>BACKEND OFFLINE</span>
+              </div>
+              {onRetryConnection && (
+                <button
+                  onClick={onRetryConnection}
+                  className="p-1 rounded bg-space-800 hover:bg-space-750 text-space-300 hover:text-space-100 border border-space-700 text-xs font-mono"
+                  title="Retry connecting to backend"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {onToggleDemoMode && (
+                <button
+                  onClick={onToggleDemoMode}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-[11px] font-mono text-amber-300"
+                  title="Launch offline synthetic demonstration dataset"
+                >
+                  <PlayCircle className="h-3 w-3 text-amber-400" />
+                  <span>Demo Mode</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {connectionState === 'offline_demo' && (
+            <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono"
+                title="Operating with synthetic demonstration telemetry (offline simulation)"
+              >
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span>OFFLINE DEMO MODE</span>
+              </div>
+              {isDemoMode && onToggleDemoMode && (
+                <button
+                  onClick={onToggleDemoMode}
+                  className="px-2 py-0.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 text-[11px] font-mono text-space-300 hover:text-space-100"
+                  title="Switch back to live backend API requests"
+                >
+                  Live API
+                </button>
+              )}
+            </div>
+          )}
+
+          {connectionState === 'error' && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-mono">
+              <AlertCircle className="h-3.5 w-3.5 text-rose-400" />
+              <span>SERVER ERROR</span>
             </div>
           )}
         </div>
