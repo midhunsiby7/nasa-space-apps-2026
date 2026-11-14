@@ -20,22 +20,39 @@ def _migrate_sqlite_columns() -> None:
     """Non-destructive migration to add missing columns to SQLite database if table already exists."""
     with engine.connect() as conn:
         try:
+            # Check measurement table columns
             result = conn.execute(text("PRAGMA table_info(measurement)"))
-            existing_cols = {row[1] for row in result.fetchall()}
-            if not existing_cols:
-                return
+            existing_meas_cols = {row[1] for row in result.fetchall()}
+            if existing_meas_cols:
+                meas_columns_to_add = [
+                    ("exercise_modality", "VARCHAR(64)"),
+                    ("measurement_site", "VARCHAR(64)"),
+                    ("measurement_method", "VARCHAR(64)"),
+                    ("sensor_model", "VARCHAR(64)"),
+                    ("mission_day", "INTEGER"),
+                ]
+                for col_name, col_type in meas_columns_to_add:
+                    if col_name not in existing_meas_cols:
+                        conn.execute(text(f"ALTER TABLE measurement ADD COLUMN {col_name} {col_type}"))
 
-            columns_to_add = [
-                ("exercise_modality", "VARCHAR(64)"),
-                ("measurement_site", "VARCHAR(64)"),
-                ("measurement_method", "VARCHAR(64)"),
-                ("sensor_model", "VARCHAR(64)"),
-                ("mission_day", "INTEGER"),
-            ]
+            # Check astronaut_baseline table columns
+            base_result = conn.execute(text("PRAGMA table_info(astronaut_baseline)"))
+            existing_base_cols = {row[1] for row in base_result.fetchall()}
+            if existing_base_cols:
+                base_columns_to_add = [
+                    ("baseline_type", "VARCHAR(32) DEFAULT 'inflight'"),
+                    ("maturity", "VARCHAR(32) DEFAULT 'insufficient'"),
+                    ("version", "INTEGER DEFAULT 1"),
+                    ("is_active", "BOOLEAN DEFAULT 1"),
+                    ("is_finalized", "BOOLEAN DEFAULT 0"),
+                    ("supersedes_baseline_id", "VARCHAR(64)"),
+                    ("maturity_evaluated_at", "TIMESTAMP"),
+                    ("maturity_criteria_snapshot", "VARCHAR(512)"),
+                ]
+                for col_name, col_type in base_columns_to_add:
+                    if col_name not in existing_base_cols:
+                        conn.execute(text(f"ALTER TABLE astronaut_baseline ADD COLUMN {col_name} {col_type}"))
 
-            for col_name, col_type in columns_to_add:
-                if col_name not in existing_cols:
-                    conn.execute(text(f"ALTER TABLE measurement ADD COLUMN {col_name} {col_type}"))
             conn.commit()
         except Exception:
             pass

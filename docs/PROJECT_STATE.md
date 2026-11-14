@@ -141,8 +141,9 @@ COSMOLOOKUP follows a decoupled three-tier architecture:
 - [x] Approved Phase 2 Architecture (`docs/architecture/PHASE_2_BASELINE_DESIGN.md`).
 - [x] Implemented Phase 2A Measurement Foundation (Catalog, Normalization, Context Taxonomy, Modality Isolation, Comparability Rules).
 - [x] Implemented Phase 2B Personal Baseline Calculation Engine (Robust non-parametric statistics, Personal Operational Envelopes, API endpoints, 63 automated tests).
-- [ ] Phase 2C — Preflight/In-flight Baseline Versioning & Maturity Progression.
-- [ ] Phase 3 — Trend Detection, Robust Z-scores, and Operational Decision Support.
+- [x] Implemented Phase 2C Baseline Lifecycle & Maturity Management (Preflight immutability, in-flight versioning, criteria snapshots, 4 API endpoints).
+- [x] Implemented Phase 2D Trend Intelligence & Freshness Engine (Sen's slope rate-of-change, robust Z-scores, consecutive run-rules, staleness intervals, 3 API endpoints).
+- [x] Implemented Phase 2E Explainable Health Assessment & Alerts (Multi-tier attention classifications, transparent explanations, safe non-diagnostic guidance, alert deduplication & lifecycle, 8 API endpoints, 81 automated tests).
 
 ---
 
