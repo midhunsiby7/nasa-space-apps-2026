@@ -149,7 +149,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleRunAssessment = async () => {
+  const handleRunAssessment = async (reportedSymptoms?: string[]) => {
     if (!selectedAstronautId) return;
     setIsEvaluatingAssessment(true);
     try {
@@ -157,6 +157,7 @@ export const App: React.FC = () => {
         context: 'resting_cabin',
         lookback_hours: 72,
         generate_alerts: true,
+        reported_symptoms: reportedSymptoms && reportedSymptoms.length > 0 ? reportedSymptoms : undefined,
       });
       setLatestAssessment(newAssessment);
       // Refresh alerts and trends
