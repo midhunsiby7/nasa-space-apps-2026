@@ -326,6 +326,10 @@ export const App: React.FC = () => {
               <AnatomyViewport
                 astronaut={selectedAstronaut}
                 measurements={measurements}
+                baselines={baselines}
+                trends={trends}
+                alerts={alerts}
+                assessment={latestAssessment}
                 selectedMetric={selectedMetric}
                 onSelectMetric={setSelectedMetric}
                 onSwitchToChart={() => setActiveTab('telemetry')}

@@ -20,6 +20,15 @@ export const METRIC_METADATA: Record<string, MetricMeta> = {
     description: 'Autonomous cardiovascular rate telemetry captured via sensor array',
     nominalRange: '60 – 100 bpm (rest baseline)',
   },
+  spo2: {
+    type: 'spo2',
+    label: 'Oxygen Saturation (SpO2)',
+    shortLabel: 'SpO2',
+    unit: '%',
+    color: '#38bdf8', // cyan
+    description: 'Peripheral capillary oxygen saturation via pulse oximetry',
+    nominalRange: '95.0% – 100.0%',
+  },
   blood_oxygen: {
     type: 'blood_oxygen',
     label: 'Blood Oxygen (SpO2)',
@@ -29,6 +38,15 @@ export const METRIC_METADATA: Record<string, MetricMeta> = {
     description: 'Peripheral arterial oxygen saturation via pulse oximetry',
     nominalRange: '95.0% – 100.0%',
   },
+  respiratory_rate: {
+    type: 'respiratory_rate',
+    label: 'Respiratory Rate',
+    shortLabel: 'RESP',
+    unit: 'breaths/min',
+    color: '#10b981', // emerald
+    description: 'Thoracic ventilation cadence and expansion cycles',
+    nominalRange: '12 – 20 breaths/min',
+  },
   core_temperature: {
     type: 'core_temperature',
     label: 'Core Body Temperature',
@@ -37,6 +55,42 @@ export const METRIC_METADATA: Record<string, MetricMeta> = {
     color: '#f59e0b', // amber
     description: 'Internal thermoregulatory reading via ingestible thermal telemetry',
     nominalRange: '36.5 – 37.5 °C',
+  },
+  body_temperature: {
+    type: 'body_temperature',
+    label: 'Body Temperature',
+    shortLabel: 'Body Temp',
+    unit: '°C',
+    color: '#f59e0b', // amber
+    description: 'Skin / peripheral thermometry telemetry',
+    nominalRange: '36.0 – 37.2 °C',
+  },
+  blood_pressure_systolic: {
+    type: 'blood_pressure_systolic',
+    label: 'Systolic Blood Pressure',
+    shortLabel: 'SBP',
+    unit: 'mmHg',
+    color: '#fb7185', // rose light
+    description: 'Peak aortic vascular ejection pressure',
+    nominalRange: '90 – 120 mmHg',
+  },
+  blood_pressure_diastolic: {
+    type: 'blood_pressure_diastolic',
+    label: 'Diastolic Blood Pressure',
+    shortLabel: 'DBP',
+    unit: 'mmHg',
+    color: '#fda4af', // rose lighter
+    description: 'Resting arterial vascular diastolic pressure',
+    nominalRange: '60 – 80 mmHg',
+  },
+  sleep_duration: {
+    type: 'sleep_duration',
+    label: 'Sleep Duration',
+    shortLabel: 'Sleep',
+    unit: 'hours',
+    color: '#818cf8', // indigo
+    description: 'Circadian rest period duration from sleep stage telemetry',
+    nominalRange: '7.0 – 8.5 hours',
   },
   radiation_dose: {
     type: 'radiation_dose',

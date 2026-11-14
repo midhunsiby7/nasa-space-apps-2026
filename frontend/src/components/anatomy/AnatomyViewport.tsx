@@ -1,363 +1,436 @@
 import React, { useState } from 'react';
 import {
   Activity,
-  RotateCw,
+  Layers,
+  RotateCcw,
+  Box,
+  Radio,
+  Eye,
   Heart,
-  Droplet,
   Thermometer,
+  Wind,
+  Sparkles,
   Zap,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement, MeasurementType } from '../../types/measurement';
-import { getMetricMeta, formatDataQuality, formatProvenance } from '../../utils/formatters';
+import { BaselineResponse } from '../../types/baseline';
+import { TrendObservation } from '../../types/trend';
+import { AlertResponse } from '../../types/alert';
+import { AssessmentResponse } from '../../types/assessment';
+import {
+  AnatomicalRegionId,
+  ANATOMICAL_REGIONS,
+  ANATOMICAL_REGION_LIST,
+} from './anatomyRegistry';
+import { AnatomyScene } from './AnatomyScene';
+import { RegionTelemetryInspector } from './RegionTelemetryInspector';
+import { NonAnatomicalDataDrawer } from './NonAnatomicalDataDrawer';
 
 interface AnatomyViewportProps {
   astronaut: Astronaut | null;
   measurements: Measurement[];
+  baselines?: BaselineResponse[];
+  trends?: TrendObservation[];
+  alerts?: AlertResponse[];
+  assessment?: AssessmentResponse | null;
   selectedMetric?: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   onSwitchToChart: () => void;
 }
 
-type AnatomicalRegion = 'cardiopulmonary' | 'core' | 'systemic' | 'cranial';
-
 export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
   astronaut,
   measurements,
-  selectedMetric: _selectedMetric,
+  baselines = [],
+  trends = [],
+  alerts = [],
+  assessment = null,
+  selectedMetric,
   onSelectMetric,
   onSwitchToChart,
 }) => {
-  const [selectedRegion, setSelectedRegion] = useState<AnatomicalRegion>('cardiopulmonary');
-  const [rotationAngle, setRotationAngle] = useState<number>(0);
-  const [pitchAngle, setPitchAngle] = useState<number>(0);
+  const [selectedRegion, setSelectedRegion] = useState<AnatomicalRegionId>('cardiovascular');
+  const [hoveredRegion, setHoveredRegion] = useState<AnatomicalRegionId | null>(null);
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
+  const [isWireframe, setIsWireframe] = useState<boolean>(false);
+  const [resetTrigger, setResetTrigger] = useState<number>(0);
+  const [isNonAnatomicalOpen, setIsNonAnatomicalOpen] = useState<boolean>(false);
 
-  // Map regions to measurement types
-  const regionMetrics: Record<AnatomicalRegion, MeasurementType> = {
-    cardiopulmonary: 'heart_rate',
-    core: 'core_temperature',
-    systemic: 'radiation_dose',
-    cranial: 'blood_oxygen',
-  };
+  const activeRegionConfig = ANATOMICAL_REGIONS[selectedRegion];
 
-  const activeMetricType = regionMetrics[selectedRegion];
-  const meta = getMetricMeta(activeMetricType);
-
-  // Latest measurement for this metric
-  const latest = measurements
-    .filter((m) => m.measurement_type === activeMetricType)
-    .sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime())[0];
-
-  const quality = latest ? formatDataQuality(latest.data_quality) : null;
-  const provenance = latest ? formatProvenance(latest.is_synthetic) : null;
-
-  const handleRegionClick = (region: AnatomicalRegion) => {
-    setSelectedRegion(region);
-    onSelectMetric(regionMetrics[region]);
+  // Helper to map region icons
+  const getRegionIcon = (id: AnatomicalRegionId) => {
+    switch (id) {
+      case 'cardiovascular':
+        return <Heart className="h-3.5 w-3.5" />;
+      case 'respiratory':
+        return <Wind className="h-3.5 w-3.5" />;
+      case 'thermoregulation':
+        return <Thermometer className="h-3.5 w-3.5" />;
+      case 'ocular':
+        return <Eye className="h-3.5 w-3.5" />;
+      case 'neurological':
+        return <Sparkles className="h-3.5 w-3.5" />;
+      case 'musculoskeletal':
+        return <Layers className="h-3.5 w-3.5" />;
+      default:
+        return <Activity className="h-3.5 w-3.5" />;
+    }
   };
 
   return (
-    <div className="space-y-5">
-      {/* Viewport Header */}
-      <div className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-4">
+      {/* Viewport Control Bar */}
+      <div className="rounded-lg border border-space-700 bg-space-850 p-3.5 shadow-hud-card">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-telemetry-cyan" />
               <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-space-100">
-                3D Anatomical Telemetry Viewport
+                Interactive Anatomical Telemetry Navigator
               </h3>
               <span className="rounded bg-telemetry-cyan/15 px-2 py-0.5 font-mono text-[10px] text-telemetry-cyan border border-telemetry-cyan/30">
-                CANVAS INTEGRATION READY
+                {viewMode === '3d' ? '3D HOLOGRAPHIC MESH' : '2D SCHEMATIC'}
               </span>
             </div>
             <p className="font-mono text-xs text-space-400 mt-1">
-              Select anatomical zones to inspect localized physiological sensors. Architecture prepared for WebGL / Three.js.
+              Select anatomical zones to inspect telemetry sensors, baseline operational envelopes, and trend trajectories.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Action Toolbar */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* View Mode Toggle (3D vs 2D) */}
             <button
-              onClick={() => {
-                setRotationAngle((prev) => (prev + 45) % 360);
-              }}
+              onClick={() => setViewMode((prev) => (prev === '3d' ? '2d' : '3d'))}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 text-xs font-mono text-space-200 transition-colors"
+              title="Toggle between 3D Spatial Canvas and 2D Schematic"
             >
-              <RotateCw className="h-3.5 w-3.5 text-telemetry-cyan" />
-              <span>Rotate Yaw ({rotationAngle}°)</span>
+              <Box className="h-3.5 w-3.5 text-telemetry-cyan" />
+              <span>{viewMode === '3d' ? 'Switch to 2D' : 'Switch to 3D'}</span>
             </button>
+
+            {/* Wireframe Toggle (only in 3D mode) */}
+            {viewMode === '3d' && (
+              <button
+                onClick={() => setIsWireframe((prev) => !prev)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-mono transition-colors ${
+                  isWireframe
+                    ? 'bg-telemetry-cyan/20 border-telemetry-cyan text-telemetry-cyan font-bold'
+                    : 'bg-space-800 hover:bg-space-750 border-space-700 text-space-300'
+                }`}
+                title="Toggle mesh wireframe visualization"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span>{isWireframe ? 'Wireframe: ON' : 'Wireframe: OFF'}</span>
+              </button>
+            )}
+
+            {/* Reset Camera View */}
+            {viewMode === '3d' && (
+              <button
+                onClick={() => setResetTrigger((prev) => prev + 1)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 text-xs font-mono text-space-300 hover:text-space-100"
+                title="Reset Camera Orientation"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset View</span>
+              </button>
+            )}
+
+            {/* Open Non-Anatomical Data Drawer */}
             <button
-              onClick={() => {
-                setRotationAngle(0);
-                setPitchAngle(0);
-              }}
-              className="px-2.5 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 text-xs font-mono text-space-400 hover:text-space-200"
-              title="Reset View Vector"
+              onClick={() => setIsNonAnatomicalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-purple-900/30 hover:bg-purple-900/50 border border-purple-500/40 text-xs font-mono text-purple-200 transition-colors"
+              title="View non-anatomical channels (Radiation, ECLSS, Sleep)"
             >
-              Reset
+              <Radio className="h-3.5 w-3.5 text-purple-400" />
+              <span>Non-Anatomical Channels</span>
             </button>
           </div>
+        </div>
+
+        {/* Region Fast Selection Pills */}
+        <div className="mt-3 pt-3 border-t border-space-800 flex flex-wrap gap-1.5">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-space-400 self-center mr-1">
+            Focus Zone:
+          </span>
+          {ANATOMICAL_REGION_LIST.map((reg) => {
+            const isSelected = selectedRegion === reg.id;
+            return (
+              <button
+                key={reg.id}
+                onClick={() => setSelectedRegion(reg.id)}
+                onMouseEnter={() => setHoveredRegion(reg.id)}
+                onMouseLeave={() => setHoveredRegion(null)}
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-mono text-xs transition-colors ${
+                  isSelected
+                    ? 'bg-space-700 text-space-100 font-bold border'
+                    : 'bg-space-900/70 text-space-400 hover:bg-space-800 hover:text-space-200 border border-space-800'
+                }`}
+                style={{
+                  borderColor: isSelected ? reg.color : undefined,
+                }}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: reg.color }}
+                />
+                {getRegionIcon(reg.id)}
+                <span>{reg.label.split(' ')[0]}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Main Interactive Stage Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left 2 Cols: 3D Wireframe Mannequin Canvas Container */}
-        <div className="lg:col-span-2 relative rounded-lg bg-space-950/90 border border-space-750 p-6 flex flex-col items-center justify-center min-h-[460px] overflow-hidden shadow-hud-card telemetry-grid">
-          {/* Overlay HUD indicators */}
-          <div className="absolute top-4 left-4 font-mono text-[11px] text-space-400 space-y-1 z-10">
-            <div>TARGET: <span className="text-space-100 font-bold">{astronaut?.name || 'ASTRONAUT STANDBY'}</span></div>
-            <div>COORDINATES: <span className="text-telemetry-cyan">X: 0.00 Y: {rotationAngle}° Z: {pitchAngle}°</span></div>
-            <div>STATUS: <span className="text-telemetry-emerald">TELEMETRY LINK ACTIVE</span></div>
-          </div>
-
-          <div className="absolute top-4 right-4 z-10">
-            <span className="font-mono text-[10px] text-space-400 px-2 py-1 rounded bg-space-900/80 border border-space-700">
-              FRAME RATE: 60 FPS
-            </span>
-          </div>
-
-          {/* Interactive Biomechanical Wireframe Mannequin */}
-          <div
-            className="relative transition-transform duration-500 ease-out select-none"
-            style={{
-              transform: `perspective(800px) rotateY(${rotationAngle * 0.4}deg) rotateX(${pitchAngle}deg)`,
-            }}
-          >
-            {/* SVG Wireframe Mannequin */}
-            <svg
-              width="220"
-              height="380"
-              viewBox="0 0 220 380"
-              className="drop-shadow-2xl"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* Head / Cranial */}
-              <circle
-                cx="110"
-                cy="40"
-                r="24"
-                stroke={selectedRegion === 'cranial' ? '#38bdf8' : '#3c527a'}
-                strokeWidth={selectedRegion === 'cranial' ? '2.5' : '1.5'}
-                fill="#101725"
-                className="cursor-pointer transition-colors"
-                onClick={() => handleRegionClick('cranial')}
+      {/* Main Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[580px]">
+        {/* Left Column: 3D Holographic Scene or 2D Schematic */}
+        <div className="lg:col-span-7 flex flex-col rounded-lg border border-space-700 bg-space-900 shadow-hud-card overflow-hidden min-h-[500px]">
+          {/* Viewport Top Status Banner */}
+          <div className="flex items-center justify-between border-b border-space-800 bg-space-850 px-3.5 py-2">
+            <div className="flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: activeRegionConfig.color }}
               />
-              {/* Neck */}
-              <line x1="110" y1="64" x2="110" y2="76" stroke="#3c527a" strokeWidth="2" />
-
-              {/* Torso / Cardiopulmonary */}
-              <path
-                d="M75 76 L145 76 L135 150 L85 150 Z"
-                stroke={selectedRegion === 'cardiopulmonary' ? '#f43f5e' : '#3c527a'}
-                strokeWidth={selectedRegion === 'cardiopulmonary' ? '2.5' : '1.5'}
-                fill={selectedRegion === 'cardiopulmonary' ? 'rgba(244, 63, 94, 0.12)' : '#101725'}
-                className="cursor-pointer transition-colors"
-                onClick={() => handleRegionClick('cardiopulmonary')}
-              />
-
-              {/* Abdomen / Core Temperature */}
-              <path
-                d="M85 150 L135 150 L125 210 L95 210 Z"
-                stroke={selectedRegion === 'core' ? '#f59e0b' : '#3c527a'}
-                strokeWidth={selectedRegion === 'core' ? '2.5' : '1.5'}
-                fill={selectedRegion === 'core' ? 'rgba(245, 158, 11, 0.12)' : '#101725'}
-                className="cursor-pointer transition-colors"
-                onClick={() => handleRegionClick('core')}
-              />
-
-              {/* Left Arm */}
-              <path
-                d="M75 76 L40 140 L30 200"
-                stroke={selectedRegion === 'systemic' ? '#a855f7' : '#273856'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('systemic')}
-              />
-              {/* Right Arm */}
-              <path
-                d="M145 76 L180 140 L190 200"
-                stroke={selectedRegion === 'systemic' ? '#a855f7' : '#273856'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('systemic')}
-              />
-
-              {/* Left Leg */}
-              <path
-                d="M95 210 L85 290 L80 360"
-                stroke={selectedRegion === 'systemic' ? '#a855f7' : '#273856'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('systemic')}
-              />
-              {/* Right Leg */}
-              <path
-                d="M125 210 L135 290 L140 360"
-                stroke={selectedRegion === 'systemic' ? '#a855f7' : '#273856'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('systemic')}
-              />
-
-              {/* Hotspot: Heart / Cardiopulmonary */}
-              <circle
-                cx="118"
-                cy="105"
-                r="6"
-                fill="#f43f5e"
-                className="animate-ping opacity-75"
-              />
-              <circle
-                cx="118"
-                cy="105"
-                r="5"
-                fill="#f43f5e"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('cardiopulmonary')}
-              />
-
-              {/* Hotspot: Core Temp */}
-              <circle
-                cx="110"
-                cy="175"
-                r="5"
-                fill="#f59e0b"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('core')}
-              />
-
-              {/* Hotspot: Cranial */}
-              <circle
-                cx="110"
-                cy="40"
-                r="4"
-                fill="#38bdf8"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                className="cursor-pointer"
-                onClick={() => handleRegionClick('cranial')}
-              />
-            </svg>
-          </div>
-
-          {/* Hotspot Legend Footer */}
-          <div className="absolute bottom-3 inset-x-4 flex flex-wrap items-center justify-center gap-3 font-mono text-[11px] bg-space-900/80 px-3 py-1.5 rounded border border-space-700/60">
-            <span className="text-space-400">Click Zones:</span>
-            <button
-              onClick={() => handleRegionClick('cardiopulmonary')}
-              className={`flex items-center gap-1 ${selectedRegion === 'cardiopulmonary' ? 'text-rose-400 font-bold' : 'text-space-300'}`}
-            >
-              <Heart className="h-3 w-3" /> Cardiopulmonary
-            </button>
-            <button
-              onClick={() => handleRegionClick('core')}
-              className={`flex items-center gap-1 ${selectedRegion === 'core' ? 'text-amber-400 font-bold' : 'text-space-300'}`}
-            >
-              <Thermometer className="h-3 w-3" /> Core Vitals
-            </button>
-            <button
-              onClick={() => handleRegionClick('cranial')}
-              className={`flex items-center gap-1 ${selectedRegion === 'cranial' ? 'text-sky-400 font-bold' : 'text-space-300'}`}
-            >
-              <Droplet className="h-3 w-3" /> Oxygen / Cranial
-            </button>
-            <button
-              onClick={() => handleRegionClick('systemic')}
-              className={`flex items-center gap-1 ${selectedRegion === 'systemic' ? 'text-purple-400 font-bold' : 'text-space-300'}`}
-            >
-              <Zap className="h-3 w-3" /> Systemic Dose
-            </button>
-          </div>
-        </div>
-
-        {/* Right 1 Col: Selected Region Telemetry Inspector */}
-        <div className="rounded-lg bg-space-850 p-5 border border-space-700/80 shadow-hud-card flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-space-700/60 mb-4">
-              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-space-400">
-                Zone Telemetry Inspector
+              <span className="font-mono text-xs font-bold text-space-200 uppercase tracking-wider">
+                {activeRegionConfig.label}
               </span>
-              <span className="font-mono text-xs text-telemetry-cyan font-bold uppercase">
-                {selectedRegion}
+              <span className="font-mono text-[10px] text-space-400">
+                ({activeRegionConfig.system})
               </span>
             </div>
 
-            {/* Metric Overview */}
-            <div className="space-y-4 font-mono">
-              <div>
-                <span className="text-xs text-space-400 block mb-1">BOUND METRIC CHANNEL:</span>
-                <span className="text-sm font-bold text-space-100 flex items-center gap-2">
-                  <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: meta.color }}
+            <div className="font-mono text-[10px] text-space-400 hidden sm:block">
+              {viewMode === '3d'
+                ? 'Left Drag: Orbit • Scroll: Zoom • Right Drag: Pan'
+                : 'Interactive 2D Telemetry Mannequin'}
+            </div>
+          </div>
+
+          {/* Interactive Rendering Canvas */}
+          <div className="relative flex-1 min-h-[460px] w-full">
+            {viewMode === '3d' ? (
+              <AnatomyScene
+                selectedRegion={selectedRegion}
+                onSelectRegion={setSelectedRegion}
+                hoveredRegion={hoveredRegion}
+                onHoverRegion={setHoveredRegion}
+                isWireframe={isWireframe}
+                onFallbackTo2D={() => setViewMode('2d')}
+                resetTrigger={resetTrigger}
+              />
+            ) : (
+              /* 2D Schematic Fallback Mannequin */
+              <div className="flex h-full w-full flex-col items-center justify-center p-4 bg-gradient-to-b from-space-950 via-space-900 to-space-950">
+                <svg
+                  viewBox="0 0 400 500"
+                  className="h-full max-h-[440px] w-auto drop-shadow-lg select-none"
+                >
+                  {/* Outer Silhouette Guide */}
+                  <path
+                    d="M 200 40 Q 230 40 230 70 Q 230 100 215 110 L 255 130 L 285 240 L 270 245 L 245 155 L 235 240 L 245 360 L 230 470 L 210 470 L 215 280 L 200 280 L 185 280 L 190 470 L 170 470 L 155 360 L 165 240 L 155 155 L 130 245 L 115 240 L 145 130 L 185 110 Q 170 100 170 70 Q 170 40 200 40 Z"
+                    fill="none"
+                    stroke="#1e293b"
+                    strokeWidth="2"
+                    strokeDasharray="4 4"
                   />
-                  {meta.label}
-                </span>
-                <p className="text-[11px] text-space-400 mt-1 leading-relaxed">
-                  {meta.description}
+
+                  {/* 1. Cranium / Neurological Region */}
+                  <g
+                    className="cursor-pointer transition-all duration-200"
+                    onClick={() => setSelectedRegion('neurological')}
+                    onMouseEnter={() => setHoveredRegion('neurological')}
+                    onMouseLeave={() => setHoveredRegion(null)}
+                  >
+                    <ellipse
+                      cx="200"
+                      cy="75"
+                      rx="30"
+                      ry="35"
+                      fill={selectedRegion === 'neurological' ? '#06b6d4' : '#083344'}
+                      fillOpacity={selectedRegion === 'neurological' ? 0.75 : hoveredRegion === 'neurological' ? 0.5 : 0.25}
+                      stroke="#06b6d4"
+                      strokeWidth={selectedRegion === 'neurological' ? 3 : 1.5}
+                    />
+                    <text x="200" y="80" textAnchor="middle" fill="#e0f2fe" fontSize="10" fontFamily="monospace">
+                      BRAIN
+                    </text>
+                  </g>
+
+                  {/* 2. Bilateral Ocular Region */}
+                  <g
+                    className="cursor-pointer transition-all duration-200"
+                    onClick={() => setSelectedRegion('ocular')}
+                    onMouseEnter={() => setHoveredRegion('ocular')}
+                    onMouseLeave={() => setHoveredRegion(null)}
+                  >
+                    <circle
+                      cx="190"
+                      cy="70"
+                      r="6"
+                      fill={selectedRegion === 'ocular' ? '#38bdf8' : '#075985'}
+                      fillOpacity={selectedRegion === 'ocular' ? 0.9 : 0.4}
+                      stroke="#38bdf8"
+                      strokeWidth={selectedRegion === 'ocular' ? 2 : 1}
+                    />
+                    <circle
+                      cx="210"
+                      cy="70"
+                      r="6"
+                      fill={selectedRegion === 'ocular' ? '#38bdf8' : '#075985'}
+                      fillOpacity={selectedRegion === 'ocular' ? 0.9 : 0.4}
+                      stroke="#38bdf8"
+                      strokeWidth={selectedRegion === 'ocular' ? 2 : 1}
+                    />
+                  </g>
+
+                  {/* 3. Pulmonary / Respiratory Region (Lungs) */}
+                  <g
+                    className="cursor-pointer transition-all duration-200"
+                    onClick={() => setSelectedRegion('respiratory')}
+                    onMouseEnter={() => setHoveredRegion('respiratory')}
+                    onMouseLeave={() => setHoveredRegion(null)}
+                  >
+                    <path
+                      d="M 172 135 C 160 145 155 175 172 195 C 185 195 190 175 190 145 Z"
+                      fill={selectedRegion === 'respiratory' ? '#10b981' : '#064e3b'}
+                      fillOpacity={selectedRegion === 'respiratory' ? 0.75 : hoveredRegion === 'respiratory' ? 0.5 : 0.25}
+                      stroke="#10b981"
+                      strokeWidth={selectedRegion === 'respiratory' ? 2.5 : 1}
+                    />
+                    <path
+                      d="M 228 135 C 240 145 245 175 228 195 C 215 195 210 175 210 145 Z"
+                      fill={selectedRegion === 'respiratory' ? '#10b981' : '#064e3b'}
+                      fillOpacity={selectedRegion === 'respiratory' ? 0.75 : hoveredRegion === 'respiratory' ? 0.5 : 0.25}
+                      stroke="#10b981"
+                      strokeWidth={selectedRegion === 'respiratory' ? 2.5 : 1}
+                    />
+                    <text x="200" y="142" textAnchor="middle" fill="#a7f3d0" fontSize="9" fontFamily="monospace">
+                      PULMONARY
+                    </text>
+                  </g>
+
+                  {/* 4. Cardiovascular Region (Heart & Aortic Root) */}
+                  <g
+                    className="cursor-pointer transition-all duration-200"
+                    onClick={() => setSelectedRegion('cardiovascular')}
+                    onMouseEnter={() => setHoveredRegion('cardiovascular')}
+                    onMouseLeave={() => setHoveredRegion(null)}
+                  >
+                    <path
+                      d="M 195 155 C 190 145 180 150 185 165 C 190 175 200 185 200 185 C 200 185 210 175 215 165 C 220 150 210 145 205 155 C 200 160 200 160 195 155 Z"
+                      fill={selectedRegion === 'cardiovascular' ? '#f43f5e' : '#881337'}
+                      fillOpacity={selectedRegion === 'cardiovascular' ? 0.85 : hoveredRegion === 'cardiovascular' ? 0.6 : 0.35}
+                      stroke="#f43f5e"
+                      strokeWidth={selectedRegion === 'cardiovascular' ? 3 : 1.5}
+                    />
+                    <text x="200" y="172" textAnchor="middle" fill="#ffe4e6" fontSize="9" fontFamily="monospace">
+                      CARDIAC
+                    </text>
+                  </g>
+
+                  {/* 5. Core Thermoregulation Region (Viscera / GI) */}
+                  <g
+                    className="cursor-pointer transition-all duration-200"
+                    onClick={() => setSelectedRegion('thermoregulation')}
+                    onMouseEnter={() => setHoveredRegion('thermoregulation')}
+                    onMouseLeave={() => setHoveredRegion(null)}
+                  >
+                    <rect
+                      x="175"
+                      y="200"
+                      width="50"
+                      height="40"
+                      rx="8"
+                      fill={selectedRegion === 'thermoregulation' ? '#f59e0b' : '#78350f'}
+                      fillOpacity={selectedRegion === 'thermoregulation' ? 0.75 : hoveredRegion === 'thermoregulation' ? 0.5 : 0.25}
+                      stroke="#f59e0b"
+                      strokeWidth={selectedRegion === 'thermoregulation' ? 2.5 : 1}
+                    />
+                    <text x="200" y="224" textAnchor="middle" fill="#fef3c7" fontSize="9" fontFamily="monospace">
+                      CORE TEMP
+                    </text>
+                  </g>
+
+                  {/* 6. Musculoskeletal Framework (Spine & Limbs) */}
+                  <g
+                    className="cursor-pointer transition-all duration-200"
+                    onClick={() => setSelectedRegion('musculoskeletal')}
+                    onMouseEnter={() => setHoveredRegion('musculoskeletal')}
+                    onMouseLeave={() => setHoveredRegion(null)}
+                  >
+                    {/* Spine Column */}
+                    <line
+                      x1="200"
+                      y1="110"
+                      x2="200"
+                      y2="245"
+                      stroke={selectedRegion === 'musculoskeletal' ? '#c084fc' : '#581c87'}
+                      strokeWidth={selectedRegion === 'musculoskeletal' ? 4 : 2}
+                      strokeDasharray="3 3"
+                    />
+                    {/* Extremities Outline */}
+                    <path
+                      d="M 145 130 L 120 240 M 255 130 L 280 240 M 180 250 L 175 460 M 220 250 L 225 460"
+                      stroke={selectedRegion === 'musculoskeletal' ? '#c084fc' : '#581c87'}
+                      strokeWidth={selectedRegion === 'musculoskeletal' ? 3 : 1.5}
+                    />
+                    <text x="200" y="270" textAnchor="middle" fill="#f3e8ff" fontSize="9" fontFamily="monospace">
+                      SKELETAL
+                    </text>
+                  </g>
+                </svg>
+                <p className="font-mono text-[11px] text-space-400 mt-2">
+                  Click any anatomical sector to inspect telemetry, operational baselines, and flight protocols.
                 </p>
               </div>
+            )}
 
-              {/* Latest Value Card */}
-              <div className="rounded-lg bg-space-900 p-4 border border-space-750">
-                <div className="flex items-baseline justify-between mb-2">
-                  <span className="text-xs text-space-400">CURRENT VALUE:</span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-extrabold text-space-100">
-                      {latest ? latest.value : '—'}
-                    </span>
-                    <span className="text-xs text-space-400 font-normal">
-                      {latest ? latest.unit : meta.unit}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-space-800">
-                  <div>
-                    <span className="text-space-500 block">QUALITY:</span>
-                    <span className="text-space-300 font-semibold">{quality?.label || 'NOMINAL'}</span>
-                  </div>
-                  <div>
-                    <span className="text-space-500 block">ORIGIN:</span>
-                    <span className="text-space-300 font-semibold">{provenance?.shortLabel || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sourced Hardware Information */}
-              <div className="rounded-lg bg-space-900/60 p-3 border border-space-750 text-xs">
-                <span className="text-[11px] text-space-400 block mb-1">TRANSMITTING SENSOR:</span>
-                <span className="text-space-200">{latest?.source || 'BioHarness v3 Sensor Array'}</span>
-                {latest?.context && (
-                  <p className="text-[11px] text-space-400 mt-1 italic">
-                    Context: {latest.context}
-                  </p>
-                )}
-              </div>
+            {/* In-Canvas HUD Overlay Info */}
+            <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-space-950/80 backdrop-blur border border-space-700/60 px-2.5 py-1.5 font-mono text-[10px] text-space-300">
+              <span className="text-telemetry-cyan font-semibold">Active Sector:</span>{' '}
+              {activeRegionConfig.label}
             </div>
           </div>
+        </div>
 
-          <div className="pt-4 border-t border-space-700/60 mt-4">
-            <button
-              onClick={onSwitchToChart}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded bg-telemetry-cyan hover:bg-telemetry-cyan/90 font-mono text-xs font-bold text-space-950 transition-colors"
-            >
-              <Activity className="h-4 w-4" />
-              <span>Plot Full Time-Series Telemetry</span>
-            </button>
-          </div>
+        {/* Right Column: Region Telemetry & Clinical Intelligence Inspector */}
+        <div className="lg:col-span-5 h-[580px]">
+          <RegionTelemetryInspector
+            regionId={selectedRegion}
+            astronaut={astronaut}
+            measurements={measurements}
+            baselines={baselines}
+            trends={trends}
+            alerts={alerts}
+            assessment={assessment}
+            selectedMetric={selectedMetric}
+            onSelectMetric={onSelectMetric}
+            onNavigateToChart={(m) => {
+              onSelectMetric(m);
+              onSwitchToChart();
+            }}
+          />
         </div>
       </div>
+
+      {/* Non-Anatomical Channels Drawer */}
+      <NonAnatomicalDataDrawer
+        isOpen={isNonAnatomicalOpen}
+        onClose={() => setIsNonAnatomicalOpen(false)}
+        measurements={measurements}
+        trends={trends}
+        alerts={alerts}
+        onSelectMetric={onSelectMetric}
+        onNavigateToChart={(m) => {
+          onSelectMetric(m);
+          onSwitchToChart();
+        }}
+      />
     </div>
   );
 };
