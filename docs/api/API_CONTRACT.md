@@ -243,3 +243,152 @@ Retrieves physiological vitals, telemetry, and environmental measurements associ
   }
 }
 ```
+
+---
+
+### 4. Calculate or Refresh Personal Baseline
+
+Calculates and persists an astronaut's personal baseline envelope for a given canonical metric and context using comparable historical telemetry.
+
+- **Method:** `POST`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/calculate`
+- **Description:** Formulates robust non-parametric (median, IQR) and secondary parametric (mean, standard deviation) operational reference values.
+
+#### Request Body: `application/json`
+
+```json
+{
+  "measurement_type": "heart_rate",
+  "context": "resting_cabin",
+  "exercise_modality": null,
+  "measurement_site": null,
+  "measurement_method": null,
+  "include_degraded": false,
+  "start_time": null,
+  "end_time": null
+}
+```
+
+#### Response: `200 OK`
+
+```json
+{
+  "id": "base-4f18a2bc",
+  "astronaut_id": "astro-001",
+  "measurement_type": "heart_rate",
+  "context": "resting_cabin",
+  "exercise_modality": null,
+  "measurement_site": null,
+  "measurement_method": null,
+  "sensor_model": "BioHarness chest band",
+  "unit": "bpm",
+  "envelope": {
+    "median": 72.0,
+    "q25": 68.0,
+    "q75": 76.0,
+    "iqr": 8.0,
+    "robust_scale_iqr": 5.9303,
+    "mean": 72.4,
+    "std_dev": 5.8992,
+    "min_value": 62.0,
+    "max_value": 82.0,
+    "sample_count": 25,
+    "window_start": "2026-10-01T08:00:00Z",
+    "window_end": "2026-11-14T08:00:00Z",
+    "disclaimer": "Statistical reference values only. NOT medical diagnostic thresholds or clinical flight rules."
+  },
+  "quality_summary": {
+    "nominal": 25,
+    "degraded": 2,
+    "total_evaluated": 27
+  },
+  "algorithm_version": "v2b-iqr",
+  "is_synthetic": true,
+  "calculated_at": "2026-11-14T12:00:00Z"
+}
+```
+
+---
+
+### 5. List Astronaut Baselines
+
+Retrieves all calculated baseline envelopes for an astronaut, with optional context filtering.
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines`
+- **Query Parameters:** `context` (optional, e.g. `resting_cabin`)
+
+#### Response: `200 OK`
+
+```json
+{
+  "astronaut_id": "astro-001",
+  "data": [
+    {
+      "id": "base-4f18a2bc",
+      "astronaut_id": "astro-001",
+      "measurement_type": "heart_rate",
+      "context": "resting_cabin",
+      "exercise_modality": null,
+      "measurement_site": null,
+      "measurement_method": null,
+      "sensor_model": "BioHarness chest band",
+      "unit": "bpm",
+      "envelope": {
+        "median": 72.0,
+        "q25": 68.0,
+        "q75": 76.0,
+        "iqr": 8.0,
+        "robust_scale_iqr": 5.9303,
+        "mean": 72.4,
+        "std_dev": 5.8992,
+        "min_value": 62.0,
+        "max_value": 82.0,
+        "sample_count": 25,
+        "window_start": "2026-10-01T08:00:00Z",
+        "window_end": "2026-11-14T08:00:00Z",
+        "disclaimer": "Statistical reference values only. NOT medical diagnostic thresholds or clinical flight rules."
+      },
+      "quality_summary": {
+        "nominal": 25,
+        "degraded": 2,
+        "total_evaluated": 27
+      },
+      "algorithm_version": "v2b-iqr",
+      "is_synthetic": true,
+      "calculated_at": "2026-11-14T12:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### 6. Get Baseline by Metric
+
+Retrieves a specific baseline envelope for an astronaut and metric identifier (supports aliases such as `blood_oxygen` mapping to `spo2`).
+
+- **Method:** `GET`
+- **Route:** `/api/v1/astronauts/{astronaut_id}/baselines/{measurement_type}`
+- **Query Parameters:** `context` (optional), `exercise_modality` (optional)
+
+#### Response: `200 OK`
+
+Returns the individual `BaselineResponse` JSON object matching the specification above.
+
+#### Response: `404 Not Found`
+
+```json
+{
+  "error": {
+    "code": "BASELINE_NOT_FOUND",
+    "message": "Baseline for astronaut 'astro-001' with metric 'radiation_dose' in context 'resting_cabin' not found.",
+    "details": {
+      "astronaut_id": "astro-001",
+      "measurement_type": "radiation_dose",
+      "context": "resting_cabin"
+    }
+  }
+}
+```
