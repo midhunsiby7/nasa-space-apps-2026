@@ -5,6 +5,7 @@ from typing import Optional, TYPE_CHECKING
 from sqlalchemy import (
     String,
     Float,
+    Integer,
     Boolean,
     DateTime,
     ForeignKey,
@@ -50,6 +51,13 @@ class Measurement(Base):
     context: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     data_quality: Mapped[str] = mapped_column(String(32), nullable=False, default="nominal")
     is_synthetic: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    # Phase 2A Comparability and Context Metadata
+    exercise_modality: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None)
+    measurement_site: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None)
+    measurement_method: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None)
+    sensor_model: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None)
+    mission_day: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
 
     # N:1 Relationship back to Astronaut
     astronaut: Mapped["Astronaut"] = relationship("Astronaut", back_populates="measurements")
