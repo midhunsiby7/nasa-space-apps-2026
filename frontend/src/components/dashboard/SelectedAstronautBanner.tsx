@@ -1,8 +1,8 @@
 import React from 'react';
-import { User, Calendar, Shield, ExternalLink, Heart, Droplet, Thermometer, Zap, Activity } from 'lucide-react';
+import { User, Calendar, Shield, ExternalLink, Activity } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement } from '../../types/measurement';
-import { formatProvenance } from '../../utils/formatters';
+import { formatProvenance, getMetricMeta } from '../../utils/formatters';
 
 interface SelectedAstronautBannerProps {
   astronaut: Astronaut;
@@ -17,14 +17,26 @@ export const SelectedAstronautBanner: React.FC<SelectedAstronautBannerProps> = (
   onOpenDetails,
   onOpenAnatomy,
 }) => {
-  const hr = latestMeasurements['heart_rate'];
-  const spo2 = latestMeasurements['blood_oxygen'];
-  const temp = latestMeasurements['core_temperature'];
-  const rad = latestMeasurements['radiation_dose'];
-
-  // Check if any metric is synthetic
-  const hasSynthetic = [hr, spo2, temp, rad].some((m) => m?.is_synthetic);
+  const measurementList = Object.values(latestMeasurements);
+  const hasSynthetic = measurementList.some((m) => m.is_synthetic);
   const provInfo = formatProvenance(hasSynthetic);
+
+  // Take up to 4 key vitals for the quick banner
+  const priorityKeys = [
+    'heart_rate',
+    'spo2',
+    'blood_oxygen',
+    'core_temperature',
+    'body_temperature',
+    'respiratory_rate',
+    'blood_pressure_systolic',
+    'radiation_dose',
+  ];
+
+  const displayVitals = priorityKeys
+    .map((k) => latestMeasurements[k])
+    .filter((m): m is Measurement => Boolean(m))
+    .slice(0, 4);
 
   return (
     <div className="rounded-lg bg-space-850 border border-space-700/80 p-4 shadow-hud-card">
@@ -59,43 +71,25 @@ export const SelectedAstronautBanner: React.FC<SelectedAstronautBannerProps> = (
           </div>
         </div>
 
-        {/* Right: Quick Vitals Pill Bar + Action */}
+        {/* Right: Dynamic Vitals Pill Bar + Actions */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Heart rate pill */}
-          {hr && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-900 border border-space-700 font-mono text-xs">
-              <Heart className="h-3.5 w-3.5 text-rose-400" />
-              <span className="font-semibold text-space-100">{hr.value}</span>
-              <span className="text-[10px] text-space-400">bpm</span>
-            </div>
-          )}
-
-          {/* SpO2 pill */}
-          {spo2 && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-900 border border-space-700 font-mono text-xs">
-              <Droplet className="h-3.5 w-3.5 text-sky-400" />
-              <span className="font-semibold text-space-100">{spo2.value}</span>
-              <span className="text-[10px] text-space-400">%</span>
-            </div>
-          )}
-
-          {/* Temp pill */}
-          {temp && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-900 border border-space-700 font-mono text-xs">
-              <Thermometer className="h-3.5 w-3.5 text-amber-400" />
-              <span className="font-semibold text-space-100">{temp.value}</span>
-              <span className="text-[10px] text-space-400">°C</span>
-            </div>
-          )}
-
-          {/* Radiation pill */}
-          {rad && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-900 border border-space-700 font-mono text-xs">
-              <Zap className="h-3.5 w-3.5 text-purple-400" />
-              <span className="font-semibold text-space-100">{rad.value}</span>
-              <span className="text-[10px] text-space-400">mSv</span>
-            </div>
-          )}
+          {displayVitals.map((m) => {
+            const meta = getMetricMeta(m.measurement_type, m.unit);
+            return (
+              <div
+                key={m.measurement_type}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-900 border border-space-700 font-mono text-xs"
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ backgroundColor: meta.color }}
+                />
+                <span className="text-[11px] text-space-400">{meta.shortLabel}:</span>
+                <span className="font-semibold text-space-100">{m.value}</span>
+                <span className="text-[10px] text-space-500">{m.unit}</span>
+              </div>
+            );
+          })}
 
           {onOpenAnatomy && (
             <button

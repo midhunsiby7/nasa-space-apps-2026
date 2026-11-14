@@ -38,6 +38,8 @@ interface RegionTelemetryInspectorProps {
   selectedMetric?: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   onNavigateToChart: (metric: MeasurementType) => void;
+  onNavigateToBaselines?: (metric: MeasurementType) => void;
+  onNavigateToCatalog?: (metric: MeasurementType) => void;
 }
 
 export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> = ({
@@ -51,6 +53,8 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
   selectedMetric,
   onSelectMetric,
   onNavigateToChart,
+  onNavigateToBaselines,
+  onNavigateToCatalog,
 }) => {
   const region = ANATOMICAL_REGIONS[regionId];
 
@@ -292,7 +296,7 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
               </div>
               {baseline && (
                 <span className="rounded bg-space-800 px-2 py-0.5 font-mono text-[10px] text-space-300 border border-space-700">
-                  {baseline.baseline_type.toUpperCase()} • v{baseline.version} • {baseline.maturity}
+                  {(baseline.baseline_type || 'inflight').toUpperCase()} • v{baseline.version || 1} • {baseline.maturity || 'provisional'}
                 </span>
               )}
             </div>
@@ -334,6 +338,23 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
                 <p className="text-[10px] text-space-400 italic">
                   Envelope calculated from {baseline.envelope.sample_count} verified readings.
                 </p>
+                {onNavigateToBaselines && activeMetric && (
+                  <button
+                    onClick={() => onNavigateToBaselines(activeMetric)}
+                    className="flex w-full items-center justify-center gap-1.5 rounded bg-telemetry-cyan/15 hover:bg-telemetry-cyan/25 border border-telemetry-cyan/40 px-2.5 py-1.5 font-mono text-xs text-telemetry-cyan font-semibold transition-colors mt-2"
+                  >
+                    <TrendingUp className="h-3 w-3" />
+                    <span>Inspect Operational Envelopes in Baselines</span>
+                  </button>
+                )}
+                {onNavigateToCatalog && activeMetric && (
+                  <button
+                    onClick={() => onNavigateToCatalog(activeMetric)}
+                    className="flex w-full items-center justify-center gap-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 px-2.5 py-1.5 font-mono text-xs text-space-300 hover:text-space-100 transition-colors"
+                  >
+                    <span>View Metric Sanity Guards in Catalog</span>
+                  </button>
+                )}
               </div>
             ) : (
               <p className="font-mono text-xs text-space-400 italic">

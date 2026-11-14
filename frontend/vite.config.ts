@@ -21,7 +21,6 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
           charts: ['recharts'],
           icons: ['lucide-react'],
-          three: ['three', '@react-three/fiber', '@react-three/drei'],
         },
       },
     },
