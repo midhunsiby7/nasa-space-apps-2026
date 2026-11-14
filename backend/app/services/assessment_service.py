@@ -154,6 +154,15 @@ def generate_safe_guidance(classification: str, findings: List[AssessmentFinding
                 category="routine_operations",
                 action="Continue scheduled nominal mission timeline and physiological countermeasure schedule.",
                 rationale="Vitals are well-contained within personal operational baseline boundaries.",
+                is_medical_prescription=False,
+            )
+        )
+        guidance.append(
+            GuidanceItem(
+                category="clinical_primacy",
+                action="Never dismiss reported physical symptoms based solely on normal statistical telemetry.",
+                rationale="Telemetry models reflect statistical envelopes only; direct crew symptom reports always take clinical precedence.",
+                is_medical_prescription=False,
             )
         )
 

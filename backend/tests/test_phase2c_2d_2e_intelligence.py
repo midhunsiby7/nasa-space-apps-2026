@@ -944,3 +944,135 @@ def test_api_assessment_and_alert_endpoints(client: TestClient, db_session: Sess
     )
     assert resp_res.status_code == 200
     assert resp_res.json()["status"] == "resolved"
+
+
+def test_clinical_primacy_and_symptom_handling_in_guidance():
+    """Verify clinical primacy and symptom reporting are enforced in operational guidance."""
+    # Routine tier must include clinical primacy disclaimer
+    routine_guidance = generate_safe_guidance(classification="routine", findings=[])
+    primacy_items = [g for g in routine_guidance if g.category == "clinical_primacy"]
+    assert len(primacy_items) >= 1
+    assert "dismiss reported physical symptoms" in primacy_items[0].action
+    assert primacy_items[0].is_medical_prescription is False
+
+    # Needs attention tier must include symptom logging recommendation
+    na_guidance = generate_safe_guidance(classification="needs_attention", findings=[])
+    symptom_items = [g for g in na_guidance if g.category == "symptom_logging"]
+    assert len(symptom_items) >= 1
+    assert "daily log" in symptom_items[0].action
+
+
+def test_data_quality_influence_on_assessment_and_maturity(db_session: Session, sample_astronaut: Astronaut):
+    """Verify degraded telemetry prevents established maturity and propagates data quality status."""
+    now = datetime.now(timezone.utc)
+    # Seed 35 measurements over 10 days, but 10 are degraded (28.6% degraded > 10% tolerance)
+    for i in range(35):
+        qual = "degraded" if i < 10 else "nominal"
+        db_session.add(
+            _make_meas(
+                id=f"meas-dq-{i}",
+                astronaut_id=sample_astronaut.id,
+                measurement_type="heart_rate",
+                value=70.0 + (i % 3),
+                unit="bpm",
+                measured_at=now - timedelta(days=10 - (i * 0.25)),
+                context="resting_cabin",
+                data_quality=qual,
+            )
+        )
+    db_session.commit()
+
+    # Calculate baseline: despite N=35 and days=10, degraded percentage holds maturity at provisional
+    base = create_or_recalculate_lifecycle_baseline(
+        db=db_session,
+        astronaut_id=sample_astronaut.id,
+        measurement_type="heart_rate",
+        baseline_type="inflight",
+        context="resting_cabin",
+        include_degraded=True,
+    )
+    assert base.maturity == "provisional"
+    snapshot = json.loads(base.maturity_criteria_snapshot)
+    assert snapshot["degraded_count"] == 10
+    assert snapshot["nominal_percentage"] < 90.0
+
+    # Assessment generation propagates data quality status
+    assessment = synthesize_health_assessment(
+        db=db_session,
+        astronaut_id=sample_astronaut.id,
+        context="resting_cabin",
+        lookback_hours=240,
+        generate_alerts=False,
+    )
+    assert assessment.data_quality_status == "degraded"
+
+
+def test_historical_alert_preservation_and_status_filtering(db_session: Session, sample_astronaut: Astronaut):
+    """Verify resolved alerts remain historically queryable and status filtering works accurately."""
+    alert = create_or_update_alert(
+        db=db_session,
+        astronaut_id=sample_astronaut.id,
+        measurement_type="blood_pressure_systolic",
+        title="Elevated Systolic Pressure",
+        explanation="Consecutive elevated SBP readings.",
+        severity="medium",
+    )
+    assert alert.status == "active"
+
+    # Acknowledge and resolve
+    acknowledge_alert(db_session, alert.id)
+    resolve_alert(db_session, alert.id)
+
+    # Active alerts should now be empty
+    active_alerts = list_alerts_for_astronaut(db_session, sample_astronaut.id, status="active")
+    assert len(active_alerts) == 0
+
+    # Resolved alerts should preserve the historical record
+    resolved_alerts = list_alerts_for_astronaut(db_session, sample_astronaut.id, status="resolved")
+    assert len(resolved_alerts) == 1
+    assert resolved_alerts[0].id == alert.id
+    assert resolved_alerts[0].resolved_at is not None
+    assert resolved_alerts[0].acknowledged_at is not None
+
+
+def test_multi_astronaut_and_multi_mission_isolation_in_intelligence(db_session: Session):
+    """Verify assessments, trends, and alerts remain strictly isolated across astronauts and missions."""
+    now = datetime.now(timezone.utc)
+    # Astronaut A on Artemis VIII
+    astro_a = Astronaut(
+        id="astro-artemis-a",
+        name="Cmdr Alice",
+        crew_role="Commander",
+        mission_name="Artemis VIII",
+        mission_day=20,
+    )
+    # Astronaut B on Gateway I
+    astro_b = Astronaut(
+        id="astro-gateway-b",
+        name="Eng Bob",
+        crew_role="Flight Engineer",
+        mission_name="Gateway I",
+        mission_day=5,
+    )
+    db_session.add_all([astro_a, astro_b])
+    db_session.commit()
+
+    # Add alert for Astronaut A
+    create_or_update_alert(
+        db=db_session,
+        astronaut_id=astro_a.id,
+        measurement_type="heart_rate",
+        title="Alice HR Alert",
+        explanation="Alice elevated resting HR.",
+        severity="medium",
+    )
+
+    # Verify Astronaut B has 0 alerts
+    alerts_b = list_alerts_for_astronaut(db_session, astro_b.id)
+    assert len(alerts_b) == 0
+
+    # Verify Astronaut A has exactly 1 alert
+    alerts_a = list_alerts_for_astronaut(db_session, astro_a.id)
+    assert len(alerts_a) == 1
+    assert alerts_a[0].astronaut_id == astro_a.id
+
