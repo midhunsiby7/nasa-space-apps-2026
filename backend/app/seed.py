@@ -61,7 +61,11 @@ SEEDED_ASTRONAUTS = [
 
 
 def seed_database():
-    """Seed the database with fictional astronaut profiles, synthetic telemetry, baselines, and assessments."""
+    """Seed the database with fictional astronaut profiles, synthetic telemetry, baselines, and assessments.
+    
+    This script is designed to be fully idempotent: running it multiple times will not duplicate
+    measurements, escalate baseline version numbers, or overwrite existing records.
+    """
     print("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
 
@@ -69,7 +73,7 @@ def seed_database():
     try:
         now = datetime.now(timezone.utc)
 
-        # 1. Seed Astronauts
+        # 1. Seed Astronauts (Non-destructive: create if missing, preserve if existing)
         for astro_data in SEEDED_ASTRONAUTS:
             existing_astro = db.query(Astronaut).filter(Astronaut.id == astro_data["id"]).first()
             if not existing_astro:
@@ -84,10 +88,7 @@ def seed_database():
                 )
                 db.add(astro)
             else:
-                existing_astro.name = astro_data["name"]
-                existing_astro.crew_role = astro_data["crew_role"]
-                existing_astro.mission_name = astro_data["mission_name"]
-                existing_astro.mission_day = astro_data["mission_day"]
+                print(f"Astronaut '{astro_data['id']}' already exists. Preserving record.")
 
         db.commit()
 
@@ -173,14 +174,30 @@ def seed_database():
                     new_measurements_count += 1
 
         db.commit()
-        print(f"Seeded {new_measurements_count} new synthetic measurement records.")
+        if new_measurements_count > 0:
+            print(f"Seeded {new_measurements_count} new synthetic measurement records.")
+        else:
+            print("All synthetic measurements already exist. No duplicates added.")
 
-        # 3. Calculate Baselines for all astronauts
-        print("Calculating intra-individual baselines...")
+        # 3. Calculate Baselines for all astronauts (Idempotent: skip if active baseline exists)
+        print("Checking intra-individual baselines...")
         metrics_to_baseline = ["heart_rate", "body_temperature", "spo2", "blood_pressure_systolic"]
         for astro in SEEDED_ASTRONAUTS:
             a_id = astro["id"]
             for m_type in metrics_to_baseline:
+                existing_baseline = (
+                    db.query(AstronautBaseline)
+                    .filter(
+                        AstronautBaseline.astronaut_id == a_id,
+                        AstronautBaseline.measurement_type == m_type,
+                        AstronautBaseline.context == "resting_cabin",
+                        AstronautBaseline.is_active.is_(True),
+                    )
+                    .first()
+                )
+                if existing_baseline:
+                    continue
+
                 try:
                     create_or_recalculate_lifecycle_baseline(
                         db=db,
@@ -194,10 +211,18 @@ def seed_database():
 
         db.commit()
 
-        # 4. Generate Explainable Assessments and Alerts
-        print("Generating explainable health assessments and operational alerts...")
+        # 4. Generate Explainable Assessments and Alerts (Idempotent: skip if assessment exists)
+        print("Checking explainable health assessments and operational alerts...")
         for astro in SEEDED_ASTRONAUTS:
             a_id = astro["id"]
+            existing_asm = (
+                db.query(HealthAssessment)
+                .filter(HealthAssessment.astronaut_id == a_id)
+                .first()
+            )
+            if existing_asm:
+                continue
+
             try:
                 synthesize_health_assessment(
                     db=db,
@@ -210,7 +235,7 @@ def seed_database():
                 print(f"Note: Assessment for {a_id}: {a_err}")
 
         db.commit()
-        print("Seeding completed successfully with astronauts, telemetry, baselines, assessments, and alerts.")
+        print("Seeding verification completed successfully.")
 
     except Exception as e:
         db.rollback()

@@ -107,6 +107,12 @@ python -m app.seed
 - Seeded 5 full astronaut profiles (`astro-001` through `astro-005`).
 - Seeded 720 multi-day synthetic measurements across 9 mission days.
 - Successfully computed intra-individual baselines and synthesized explainable health assessments and operational alerts.
+- **Idempotency & Non-Destructive Protection:** Running `app.seed` repeatedly verifies existing records, prevents duplicate measurements, preserves existing astronaut attributes, and avoids unwanted baseline version increments.
+
+### D. Integration Resilience & Error Handling Verification
+- **Network vs. HTTP Error Differentiation:** `apiClient.ts` strictly distinguishes between true network failures (`Failed to fetch`) and legitimate HTTP error codes (400, 404, 409, 500). Real HTTP errors from the server are surfaced as `ApiError` rather than silently triggering demo fallback or switching connection states.
+- **Protection Against Unrelated Profile Fallbacks:** Querying an invalid or non-existent astronaut ID strictly raises a 404 error rather than silently defaulting to `astro-001`.
+- **Safe POST Lifecycle:** POST endpoints (`acknowledgeAlert`, `resolveAlert`, `generateAssessment`) reject and throw HTTP errors encountered on active connections, ensuring local mock data is never falsely mutated when the backend returns a failure.
 
 ---
 

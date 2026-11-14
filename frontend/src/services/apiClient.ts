@@ -29,6 +29,20 @@ import {
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
+export class ApiError extends Error {
+  public status: number;
+  public code?: string;
+  public details?: unknown;
+
+  constructor(status: number, message: string, code?: string, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 class ApiClient {
   private connectionState: ConnectionState = 'connected';
   private connectionListeners: ((state: ConnectionState) => void)[] = [];
@@ -56,34 +70,59 @@ class ApiClient {
   }
 
   /**
-   * Helper to perform standardized GET requests with fallback
+   * Helper to perform standardized GET requests with clear distinction between
+   * network failure (offline demo activation) and legitimate HTTP error responses.
    */
   private async getJson<T>(url: string, fallbackFn: () => T): Promise<T> {
+    if (this.connectionState === 'offline_demo') {
+      return fallbackFn();
+    }
+
+    let response: Response;
     try {
-      const response = await fetch(url, {
+      response = await fetch(url, {
         headers: { Accept: 'application/json' },
       });
-
-      if (!response.ok) {
-        throw new Error(`API error ${response.status}: ${response.statusText}`);
-      }
-
-      const data: T = await response.json();
-      this.setConnectionState('connected');
-      return data;
-    } catch (err) {
-      console.warn(`Backend API unreachable at ${url}, using demonstration fallback:`, err);
+    } catch (networkErr) {
+      console.warn(`Backend API unreachable at ${url}, activating offline demo:`, networkErr);
       this.setConnectionState('offline_demo');
       return fallbackFn();
     }
+
+    // Backend server is alive and reachable
+    this.setConnectionState('connected');
+
+    if (!response.ok) {
+      let errorData: any = {};
+      try {
+        errorData = await response.json();
+      } catch {
+        // non-JSON payload
+      }
+      const errObj = errorData.error || errorData;
+      throw new ApiError(
+        response.status,
+        errObj.message || `API error ${response.status}: ${response.statusText}`,
+        errObj.code,
+        errObj.details
+      );
+    }
+
+    return await response.json();
   }
 
   /**
-   * Helper to perform standardized POST requests with fallback
+   * Helper to perform standardized POST requests.
+   * On an active connection, HTTP errors are thrown directly to avoid unsafe silent fallbacks.
    */
   private async postJson<T, P>(url: string, payload: P, fallbackFn: () => T): Promise<T> {
+    if (this.connectionState === 'offline_demo') {
+      return fallbackFn();
+    }
+
+    let response: Response;
     try {
-      const response = await fetch(url, {
+      response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,19 +130,32 @@ class ApiClient {
         },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        throw new Error(`API error ${response.status}: ${response.statusText}`);
-      }
-
-      const data: T = await response.json();
-      this.setConnectionState('connected');
-      return data;
-    } catch (err) {
-      console.warn(`Backend API error during POST to ${url}, using demonstration fallback:`, err);
+    } catch (networkErr) {
+      console.warn(`Backend network unreachable during POST to ${url}, using offline demo:`, networkErr);
       this.setConnectionState('offline_demo');
       return fallbackFn();
     }
+
+    // Server is reachable
+    this.setConnectionState('connected');
+
+    if (!response.ok) {
+      let errorData: any = {};
+      try {
+        errorData = await response.json();
+      } catch {
+        // non-JSON
+      }
+      const errObj = errorData.error || errorData;
+      throw new ApiError(
+        response.status,
+        errObj.message || `API error ${response.status}: ${response.statusText}`,
+        errObj.code,
+        errObj.details
+      );
+    }
+
+    return await response.json();
   }
 
   /* =========================================================================
@@ -144,7 +196,9 @@ class ApiClient {
     return this.getJson<Astronaut>(url, () => {
       const found = DEMO_ASTRONAUTS.find((a) => a.id === astronautId);
       if (found) return found;
-      return DEMO_ASTRONAUTS[0];
+      throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+        astronaut_id: astronautId,
+      });
     });
   }
 
@@ -167,7 +221,14 @@ class ApiClient {
     if (params?.offset !== undefined) url.searchParams.set('offset', params.offset.toString());
 
     return this.getJson<MeasurementListResponse>(url.toString(), () => {
-      let records = DEMO_MEASUREMENTS[astronautId] || DEMO_MEASUREMENTS['astro-001'] || [];
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      let records = DEMO_MEASUREMENTS[astronautId] || [];
 
       if (params?.measurement_type) {
         records = records.filter((m) => m.measurement_type === params.measurement_type);
@@ -210,7 +271,14 @@ class ApiClient {
     if (params?.context) url.searchParams.set('context', params.context);
 
     return this.getJson<BaselineListResponse>(url.toString(), () => {
-      let records = DEMO_BASELINES[astronautId] || DEMO_BASELINES['astro-001'] || [];
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      let records = DEMO_BASELINES[astronautId] || [];
       records = records.filter((b) => b.is_active);
       if (params?.baseline_type) {
         records = records.filter((b) => b.baseline_type === params.baseline_type);
@@ -241,8 +309,14 @@ class ApiClient {
     if (params?.context) url.searchParams.set('context', params.context);
 
     return this.getJson<BaselineListResponse>(url.toString(), () => {
-      let records = DEMO_BASELINES[astronautId] || DEMO_BASELINES['astro-001'] || [];
-      records = records.filter((b) => b.measurement_type === measurementType);
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      let records = (DEMO_BASELINES[astronautId] || []).filter((b) => b.measurement_type === measurementType);
       if (params?.baseline_type) {
         records = records.filter((b) => b.baseline_type === params.baseline_type);
       }
@@ -272,7 +346,14 @@ class ApiClient {
     }
 
     return this.getJson<AstronautTrendsResponse>(url.toString(), () => {
-      const records = DEMO_TRENDS[astronautId] || DEMO_TRENDS['astro-001'] || [];
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      const records = DEMO_TRENDS[astronautId] || [];
       return {
         astronaut_id: astronautId,
         evaluated_at: new Date().toISOString(),
@@ -289,7 +370,14 @@ class ApiClient {
     const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/trends/freshness`;
 
     return this.getJson<TelemetryFreshnessResponse>(url, () => {
-      const items = DEMO_FRESHNESS[astronautId] || DEMO_FRESHNESS['astro-001'] || [];
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      const items = DEMO_FRESHNESS[astronautId] || [];
       const staleCount = items.filter((i) => i.status === 'stale').length;
       return {
         astronaut_id: astronautId,
@@ -307,15 +395,30 @@ class ApiClient {
 
   /**
    * GET /api/v1/astronauts/{astronaut_id}/assessments/latest
+   * Returns null if astronaut exists but has no assessment yet (HTTP 404 ASSESSMENT_NOT_FOUND).
    */
-  public async getLatestAssessment(astronautId: string): Promise<AssessmentResponse> {
+  public async getLatestAssessment(astronautId: string): Promise<AssessmentResponse | null> {
     const url = `${BASE_URL}/astronauts/${encodeURIComponent(astronautId)}/assessments/latest`;
 
-    return this.getJson<AssessmentResponse>(url, () => {
-      const list = DEMO_ASSESSMENTS[astronautId] || DEMO_ASSESSMENTS['astro-001'] || [];
-      if (list.length > 0) return list[0];
-      return DEMO_ASSESSMENTS['astro-001'][0];
-    });
+    try {
+      return await this.getJson<AssessmentResponse>(url, () => {
+        const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+        if (!astroExists) {
+          throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+            astronaut_id: astronautId,
+          });
+        }
+
+        const list = DEMO_ASSESSMENTS[astronautId] || [];
+        if (list.length > 0) return list[0];
+        return null as unknown as AssessmentResponse;
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404 && err.code === 'ASSESSMENT_NOT_FOUND') {
+        return null;
+      }
+      throw err;
+    }
   }
 
   /**
@@ -329,7 +432,14 @@ class ApiClient {
     url.searchParams.set('limit', limit.toString());
 
     return this.getJson<AssessmentListResponse>(url.toString(), () => {
-      const list = DEMO_ASSESSMENTS[astronautId] || DEMO_ASSESSMENTS['astro-001'] || [];
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
+      const list = DEMO_ASSESSMENTS[astronautId] || [];
       return {
         astronaut_id: astronautId,
         data: list.slice(0, limit),
@@ -356,8 +466,16 @@ class ApiClient {
       url,
       body,
       () => {
-        const list = DEMO_ASSESSMENTS[astronautId] || DEMO_ASSESSMENTS['astro-001'];
-        return list[0];
+        const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+        if (!astroExists) {
+          throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+            astronaut_id: astronautId,
+          });
+        }
+
+        const list = DEMO_ASSESSMENTS[astronautId] || [];
+        if (list.length > 0) return list[0];
+        throw new ApiError(404, `No assessment template available for astronaut '${astronautId}'.`);
       }
     );
   }
@@ -378,6 +496,13 @@ class ApiClient {
     if (params?.severity) url.searchParams.set('severity', params.severity);
 
     return this.getJson<AlertListResponse>(url.toString(), () => {
+      const astroExists = DEMO_ASTRONAUTS.some((a) => a.id === astronautId);
+      if (!astroExists) {
+        throw new ApiError(404, `Astronaut with id '${astronautId}' not found.`, 'ASTRONAUT_NOT_FOUND', {
+          astronaut_id: astronautId,
+        });
+      }
+
       let filtered = this.mutableDemoAlerts.filter((a) => a.astronaut_id === astronautId);
       if (params?.status) {
         filtered = filtered.filter((a) => a.status === params.status);
@@ -409,7 +534,7 @@ class ApiClient {
         };
         return this.mutableDemoAlerts[idx];
       }
-      throw new Error(`Alert '${alertId}' not found in demo records.`);
+      throw new ApiError(404, `Alert with id '${alertId}' not found.`, 'ALERT_NOT_FOUND', { alert_id: alertId });
     });
   }
 
@@ -429,7 +554,7 @@ class ApiClient {
         };
         return this.mutableDemoAlerts[idx];
       }
-      throw new Error(`Alert '${alertId}' not found in demo records.`);
+      throw new ApiError(404, `Alert with id '${alertId}' not found.`, 'ALERT_NOT_FOUND', { alert_id: alertId });
     });
   }
 }

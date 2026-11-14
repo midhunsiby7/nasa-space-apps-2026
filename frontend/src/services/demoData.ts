@@ -63,7 +63,6 @@ function generateTelemetrySeries(
 
     // 1. Heart Rate (bpm)
     const hrVal = Math.round(68 + Math.sin(timeIndex * 0.4) * 8 + (timeIndex === 11 ? 16 : 0));
-    const hrSynthetic = astronautId !== 'astro-001' || timeIndex > 8;
     measurements.push({
       id: `meas-${astronautId}-hr-${i}`,
       astronaut_id: astronautId,
@@ -71,15 +70,14 @@ function generateTelemetrySeries(
       value: hrVal,
       unit: 'bpm',
       measured_at: timestamp,
-      source: hrSynthetic ? 'Synthetic Biometrics Simulator v1.4' : 'BioHarness v3 Telemetry Stream',
+      source: 'BioHarness v3 Telemetry Stream',
       context: timeIndex === 11 ? 'Moderate aerobic countermeasure workout' : 'Habitat intra-vehicular baseline',
       data_quality: timeIndex === 6 ? 'interpolated' : 'nominal',
-      is_synthetic: hrSynthetic,
+      is_synthetic: true,
     });
 
     // 2. Blood Oxygen (SpO2 %)
     const spo2Val = +(97.5 + Math.cos(timeIndex * 0.3) * 0.9 - (timeIndex === 11 ? 0.6 : 0)).toFixed(1);
-    const spo2Synthetic = astronautId === 'astro-003' || astronautId === 'astro-004';
     measurements.push({
       id: `meas-${astronautId}-spo2-${i}`,
       astronaut_id: astronautId,
@@ -87,15 +85,14 @@ function generateTelemetrySeries(
       value: spo2Val,
       unit: '%',
       measured_at: timestamp,
-      source: spo2Synthetic ? 'Empirical Analog Transfer Model' : 'Pulse Oximeter Optical Band',
+      source: 'Pulse Oximeter Optical Band',
       context: 'Atmospheric partial pressure: 101.3 kPa (Nominal)',
       data_quality: 'nominal',
-      is_synthetic: spo2Synthetic,
+      is_synthetic: true,
     });
 
     // 3. Core Temperature (celsius)
     const tempVal = +(36.9 + Math.sin(timeIndex * 0.25) * 0.35 + (timeIndex === 11 ? 0.5 : 0)).toFixed(2);
-    const tempSynthetic = false; // Empirical ingestible capsule sensor data
     measurements.push({
       id: `meas-${astronautId}-temp-${i}`,
       astronaut_id: astronautId,
@@ -106,7 +103,7 @@ function generateTelemetrySeries(
       source: 'Ingestible Thermal Sensor Capsule',
       context: timeIndex === 11 ? 'Post-exercise active thermoregulation' : 'Standard circadian baseline',
       data_quality: timeIndex === 3 ? 'noisy' : 'nominal',
-      is_synthetic: tempSynthetic,
+      is_synthetic: true,
     });
 
     // 4. Radiation Dose (mSv cumulative / habitat flux)
@@ -121,7 +118,7 @@ function generateTelemetrySeries(
       source: 'Active Silicon Dosimeter Array (B-Habitat)',
       context: 'Deep-space GCR flux background monitoring',
       data_quality: 'nominal',
-      is_synthetic: false,
+      is_synthetic: true,
     });
   }
 
@@ -136,14 +133,11 @@ export const DEMO_MEASUREMENTS: Record<string, Measurement[]> = {
   'astro-005': generateTelemetrySeries('astro-005', '2026-11-14T08:00:00Z'),
 };
 
-/**
- * Realistic Personal Operational Baselines across astronauts
- */
-export const DEMO_BASELINES: Record<string, BaselineResponse[]> = {
-  'astro-001': [
+function createStandardBaselines(astroId: string, hrMedian: number, spo2Median: number, tempMedian: number, maturity: 'established' | 'provisional'): BaselineResponse[] {
+  return [
     {
-      id: 'base-001-hr-inflight',
-      astronaut_id: 'astro-001',
+      id: `base-${astroId}-hr-inflight`,
+      astronaut_id: astroId,
       measurement_type: 'heart_rate',
       context: 'resting_cabin',
       exercise_modality: null,
@@ -152,23 +146,23 @@ export const DEMO_BASELINES: Record<string, BaselineResponse[]> = {
       sensor_model: 'BioHarness-v3',
       unit: 'bpm',
       baseline_type: 'inflight',
-      maturity: 'established',
-      version: 2,
+      maturity,
+      version: 1,
       is_active: true,
       is_finalized: false,
-      supersedes_baseline_id: 'base-001-hr-v1',
+      supersedes_baseline_id: null,
       maturity_evaluated_at: '2026-11-14T06:00:00Z',
-      maturity_criteria_snapshot: 'Sample count 48 >= 30, window 14d >= 7d, nominal quality >= 85%',
+      maturity_criteria_snapshot: 'Sample count evaluated against operational standard',
       envelope: {
-        median: 68.0,
-        q25: 64.0,
-        q75: 72.0,
+        median: hrMedian,
+        q25: hrMedian - 4,
+        q75: hrMedian + 4,
         iqr: 8.0,
         robust_scale_iqr: 5.93,
-        mean: 68.4,
+        mean: hrMedian + 0.4,
         std_dev: 6.2,
-        min_value: 56.0,
-        max_value: 84.0,
+        min_value: hrMedian - 12,
+        max_value: hrMedian + 14,
         sample_count: 48,
         window_start: '2026-11-01T00:00:00Z',
         window_end: '2026-11-14T08:00:00Z',
@@ -179,8 +173,8 @@ export const DEMO_BASELINES: Record<string, BaselineResponse[]> = {
       is_synthetic: true,
     },
     {
-      id: 'base-001-spo2-inflight',
-      astronaut_id: 'astro-001',
+      id: `base-${astroId}-spo2-inflight`,
+      astronaut_id: astroId,
       measurement_type: 'blood_oxygen',
       context: 'resting_cabin',
       exercise_modality: null,
@@ -189,22 +183,22 @@ export const DEMO_BASELINES: Record<string, BaselineResponse[]> = {
       sensor_model: 'PulseOx-Pro',
       unit: '%',
       baseline_type: 'inflight',
-      maturity: 'established',
+      maturity,
       version: 1,
       is_active: true,
       is_finalized: false,
       supersedes_baseline_id: null,
       maturity_evaluated_at: '2026-11-14T06:00:00Z',
-      maturity_criteria_snapshot: 'Sample count 40 >= 30, window 14d >= 7d',
+      maturity_criteria_snapshot: 'Sample count evaluated against operational standard',
       envelope: {
-        median: 98.0,
-        q25: 97.2,
-        q75: 98.8,
+        median: spo2Median,
+        q25: spo2Median - 0.8,
+        q75: spo2Median + 0.8,
         iqr: 1.6,
         robust_scale_iqr: 1.18,
-        mean: 97.9,
+        mean: spo2Median - 0.1,
         std_dev: 1.1,
-        min_value: 95.5,
+        min_value: spo2Median - 2.5,
         max_value: 99.5,
         sample_count: 40,
         window_start: '2026-11-01T00:00:00Z',
@@ -216,8 +210,8 @@ export const DEMO_BASELINES: Record<string, BaselineResponse[]> = {
       is_synthetic: true,
     },
     {
-      id: 'base-001-temp-inflight',
-      astronaut_id: 'astro-001',
+      id: `base-${astroId}-temp-inflight`,
+      astronaut_id: astroId,
       measurement_type: 'core_temperature',
       context: 'resting_cabin',
       exercise_modality: null,
@@ -226,23 +220,23 @@ export const DEMO_BASELINES: Record<string, BaselineResponse[]> = {
       sensor_model: 'CoreTemp-Capsule',
       unit: 'celsius',
       baseline_type: 'inflight',
-      maturity: 'established',
+      maturity,
       version: 1,
       is_active: true,
       is_finalized: false,
       supersedes_baseline_id: null,
       maturity_evaluated_at: '2026-11-14T06:00:00Z',
-      maturity_criteria_snapshot: 'Sample count 36 >= 30, window 14d >= 7d',
+      maturity_criteria_snapshot: 'Sample count evaluated against operational standard',
       envelope: {
-        median: 36.95,
-        q25: 36.75,
-        q75: 37.15,
+        median: tempMedian,
+        q25: tempMedian - 0.2,
+        q75: tempMedian + 0.2,
         iqr: 0.40,
         robust_scale_iqr: 0.296,
-        mean: 36.97,
+        mean: tempMedian + 0.02,
         std_dev: 0.31,
-        min_value: 36.4,
-        max_value: 37.5,
+        min_value: tempMedian - 0.5,
+        max_value: tempMedian + 0.6,
         sample_count: 36,
         window_start: '2026-11-01T00:00:00Z',
         window_end: '2026-11-14T08:00:00Z',
@@ -252,104 +246,35 @@ export const DEMO_BASELINES: Record<string, BaselineResponse[]> = {
       created_at: '2026-11-14T06:00:00Z',
       is_synthetic: true,
     },
-    {
-      id: 'base-001-rad-inflight',
-      astronaut_id: 'astro-001',
-      measurement_type: 'radiation_dose',
-      context: 'resting_cabin',
-      exercise_modality: null,
-      measurement_site: 'Habitat Dosimeter Array',
-      measurement_method: 'Silicon Solid-State',
-      sensor_model: 'RadTrack-IV',
-      unit: 'mSv',
-      baseline_type: 'inflight',
-      maturity: 'provisional',
-      version: 1,
-      is_active: true,
-      is_finalized: false,
-      supersedes_baseline_id: null,
-      maturity_evaluated_at: '2026-11-14T06:00:00Z',
-      maturity_criteria_snapshot: 'Sample count 22 < 30; categorized as provisional',
-      envelope: {
-        median: 0.045,
-        q25: 0.039,
-        q75: 0.052,
-        iqr: 0.013,
-        robust_scale_iqr: 0.0096,
-        mean: 0.046,
-        std_dev: 0.011,
-        min_value: 0.030,
-        max_value: 0.068,
-        sample_count: 22,
-        window_start: '2026-11-05T00:00:00Z',
-        window_end: '2026-11-14T08:00:00Z',
-        disclaimer: 'Statistical reference values only. NOT medical diagnostic thresholds or clinical flight rules.',
-      },
-      quality_summary: { nominal: 22, degraded: 0, total_evaluated: 22 },
-      created_at: '2026-11-14T06:00:00Z',
-      is_synthetic: true,
-    },
-    {
-      id: 'base-001-hr-preflight',
-      astronaut_id: 'astro-001',
-      measurement_type: 'heart_rate',
-      context: 'resting_cabin',
-      exercise_modality: null,
-      measurement_site: 'Chest',
-      measurement_method: 'Clinical 12-lead Baseline',
-      sensor_model: 'JSC-CardioLab',
-      unit: 'bpm',
-      baseline_type: 'preflight',
-      maturity: 'established',
-      version: 1,
-      is_active: false,
-      is_finalized: true,
-      supersedes_baseline_id: null,
-      maturity_evaluated_at: '2026-09-20T10:00:00Z',
-      maturity_criteria_snapshot: 'Preflight JSC ground protocol completed',
-      envelope: {
-        median: 62.0,
-        q25: 58.0,
-        q75: 66.0,
-        iqr: 8.0,
-        robust_scale_iqr: 5.93,
-        mean: 62.5,
-        std_dev: 5.4,
-        min_value: 52.0,
-        max_value: 74.0,
-        sample_count: 60,
-        window_start: '2026-09-01T00:00:00Z',
-        window_end: '2026-09-20T10:00:00Z',
-        disclaimer: 'Statistical reference values only. NOT medical diagnostic thresholds or clinical flight rules.',
-      },
-      quality_summary: { nominal: 60, degraded: 0, total_evaluated: 60 },
-      created_at: '2026-09-20T10:00:00Z',
-      is_synthetic: true,
-    },
-  ],
+  ];
+}
+
+export const DEMO_BASELINES: Record<string, BaselineResponse[]> = {
+  'astro-001': createStandardBaselines('astro-001', 68.0, 98.0, 36.95, 'established'),
+  'astro-002': createStandardBaselines('astro-002', 72.0, 98.2, 36.90, 'established'),
+  'astro-003': createStandardBaselines('astro-003', 66.0, 97.8, 37.05, 'provisional'),
+  'astro-004': createStandardBaselines('astro-004', 70.0, 98.4, 36.88, 'established'),
+  'astro-005': createStandardBaselines('astro-005', 74.0, 98.1, 36.92, 'provisional'),
 };
 
-/**
- * Realistic Trend Observations
- */
-export const DEMO_TRENDS: Record<string, TrendObservation[]> = {
-  'astro-001': [
+function createStandardTrends(astroId: string, hrCur: number, hrMed: number, spo2Cur: number, tempCur: number): TrendObservation[] {
+  return [
     {
       measurement_type: 'heart_rate',
       canonical_identifier: 'heart_rate',
       context: 'resting_cabin',
       exercise_modality: null,
       unit: 'bpm',
-      current_value: 70.0,
+      current_value: hrCur,
       current_measured_at: '2026-11-14T08:00:00Z',
-      baseline_id: 'base-001-hr-inflight',
-      baseline_version: 2,
+      baseline_id: `base-${astroId}-hr-inflight`,
+      baseline_version: 1,
       baseline_type: 'inflight',
       baseline_maturity: 'established',
-      baseline_median: 68.0,
+      baseline_median: hrMed,
       baseline_iqr: 8.0,
       robust_scale_iqr: 5.93,
-      robust_z: 0.34,
+      robust_z: +((hrCur - hrMed) / 5.93).toFixed(2),
       sample_count: 32,
       sens_slope: 0.12,
       trend_direction: 'stable',
@@ -367,16 +292,16 @@ export const DEMO_TRENDS: Record<string, TrendObservation[]> = {
       context: 'resting_cabin',
       exercise_modality: null,
       unit: '%',
-      current_value: 98.1,
+      current_value: spo2Cur,
       current_measured_at: '2026-11-14T08:00:00Z',
-      baseline_id: 'base-001-spo2-inflight',
+      baseline_id: `base-${astroId}-spo2-inflight`,
       baseline_version: 1,
       baseline_type: 'inflight',
       baseline_maturity: 'established',
       baseline_median: 98.0,
       baseline_iqr: 1.6,
       robust_scale_iqr: 1.18,
-      robust_z: 0.08,
+      robust_z: +((spo2Cur - 98.0) / 1.18).toFixed(2),
       sample_count: 32,
       sens_slope: 0.02,
       trend_direction: 'stable',
@@ -394,16 +319,16 @@ export const DEMO_TRENDS: Record<string, TrendObservation[]> = {
       context: 'resting_cabin',
       exercise_modality: null,
       unit: 'celsius',
-      current_value: 37.1,
+      current_value: tempCur,
       current_measured_at: '2026-11-14T08:00:00Z',
-      baseline_id: 'base-001-temp-inflight',
+      baseline_id: `base-${astroId}-temp-inflight`,
       baseline_version: 1,
       baseline_type: 'inflight',
       baseline_maturity: 'established',
       baseline_median: 36.95,
       baseline_iqr: 0.40,
       robust_scale_iqr: 0.296,
-      robust_z: 0.51,
+      robust_z: +((tempCur - 36.95) / 0.296).toFixed(2),
       sample_count: 32,
       sens_slope: 0.04,
       trend_direction: 'stable',
@@ -415,89 +340,94 @@ export const DEMO_TRENDS: Record<string, TrendObservation[]> = {
       data_quality_status: 'nominal',
       explanation: 'Core circadian thermoregulation operating within personal median boundary.',
     },
+  ];
+}
+
+export const DEMO_TRENDS: Record<string, TrendObservation[]> = {
+  'astro-001': createStandardTrends('astro-001', 70.0, 68.0, 98.1, 37.10),
+  'astro-002': createStandardTrends('astro-002', 73.0, 72.0, 98.3, 36.92),
+  'astro-003': [
     {
-      measurement_type: 'radiation_dose',
-      canonical_identifier: 'radiation_dose',
+      measurement_type: 'heart_rate',
+      canonical_identifier: 'heart_rate',
       context: 'resting_cabin',
       exercise_modality: null,
-      unit: 'mSv',
-      current_value: 0.052,
+      unit: 'bpm',
+      current_value: 78.0,
       current_measured_at: '2026-11-14T08:00:00Z',
-      baseline_id: 'base-001-rad-inflight',
+      baseline_id: 'base-astro-003-hr-inflight',
       baseline_version: 1,
       baseline_type: 'inflight',
       baseline_maturity: 'provisional',
-      baseline_median: 0.045,
-      baseline_iqr: 0.013,
-      robust_scale_iqr: 0.0096,
-      robust_z: 0.73,
-      sample_count: 22,
-      sens_slope: 0.002,
-      trend_direction: 'stable',
-      consecutive_deviations: 0,
+      baseline_median: 66.0,
+      baseline_iqr: 8.0,
+      robust_scale_iqr: 5.93,
+      robust_z: 2.02,
+      sample_count: 32,
+      sens_slope: 1.85,
+      trend_direction: 'increasing',
+      consecutive_deviations: 2,
       is_sustained: false,
       freshness_status: 'fresh',
       hours_since_last_observation: 0.2,
-      expected_interval_hours: 12.0,
+      expected_interval_hours: 6.0,
       data_quality_status: 'nominal',
-      explanation: 'Deep-space ambient GCR flux stable; within provisional operational radiation profile.',
+      explanation: "Resting heart rate exhibiting upward trajectory exceeding |Z| > 1.5 personal boundary.",
+    },
+    {
+      measurement_type: 'blood_oxygen',
+      canonical_identifier: 'blood_oxygen',
+      context: 'resting_cabin',
+      exercise_modality: null,
+      unit: '%',
+      current_value: null,
+      current_measured_at: '2026-11-13T12:00:00Z',
+      baseline_id: 'base-astro-003-spo2-inflight',
+      baseline_version: 1,
+      baseline_type: 'inflight',
+      baseline_maturity: 'provisional',
+      baseline_median: 97.8,
+      baseline_iqr: 1.6,
+      robust_scale_iqr: 1.18,
+      robust_z: null,
+      sample_count: 18,
+      sens_slope: null,
+      trend_direction: 'insufficient_data',
+      consecutive_deviations: 0,
+      is_sustained: false,
+      freshness_status: 'stale',
+      hours_since_last_observation: 20.0,
+      expected_interval_hours: 6.0,
+      data_quality_status: 'degraded',
+      explanation: 'Telemetry stream is stale (20.0h elapsed; nominal interval <= 6.0h).',
     },
   ],
+  'astro-004': createStandardTrends('astro-004', 69.0, 70.0, 98.5, 36.85),
+  'astro-005': createStandardTrends('astro-005', 75.0, 74.0, 98.0, 36.95),
 };
 
-/**
- * Realistic Freshness Items
- */
 export const DEMO_FRESHNESS: Record<string, MetricFreshnessItem[]> = {
   'astro-001': [
-    {
-      measurement_type: 'heart_rate',
-      last_measured_at: '2026-11-14T08:00:00Z',
-      hours_since_last: 0.2,
-      expected_interval_hours: 6.0,
-      status: 'fresh',
-      message: 'Telemetry current (updated 0.2h ago; expected <= 6.0h).',
-    },
-    {
-      measurement_type: 'blood_oxygen',
-      last_measured_at: '2026-11-14T08:00:00Z',
-      hours_since_last: 0.2,
-      expected_interval_hours: 6.0,
-      status: 'fresh',
-      message: 'Telemetry current (updated 0.2h ago; expected <= 6.0h).',
-    },
-    {
-      measurement_type: 'core_temperature',
-      last_measured_at: '2026-11-14T08:00:00Z',
-      hours_since_last: 0.2,
-      expected_interval_hours: 8.0,
-      status: 'fresh',
-      message: 'Telemetry current (updated 0.2h ago; expected <= 8.0h).',
-    },
-    {
-      measurement_type: 'radiation_dose',
-      last_measured_at: '2026-11-14T08:00:00Z',
-      hours_since_last: 0.2,
-      expected_interval_hours: 12.0,
-      status: 'fresh',
-      message: 'Telemetry current (updated 0.2h ago; expected <= 12.0h).',
-    },
+    { measurement_type: 'heart_rate', last_measured_at: '2026-11-14T08:00:00Z', hours_since_last: 0.2, expected_interval_hours: 6.0, status: 'fresh', message: 'Current (0.2h ago)' },
+    { measurement_type: 'blood_oxygen', last_measured_at: '2026-11-14T08:00:00Z', hours_since_last: 0.2, expected_interval_hours: 6.0, status: 'fresh', message: 'Current (0.2h ago)' },
+    { measurement_type: 'core_temperature', last_measured_at: '2026-11-14T08:00:00Z', hours_since_last: 0.2, expected_interval_hours: 8.0, status: 'fresh', message: 'Current (0.2h ago)' },
+  ],
+  'astro-002': [
+    { measurement_type: 'heart_rate', last_measured_at: '2026-11-14T08:00:00Z', hours_since_last: 0.2, expected_interval_hours: 6.0, status: 'fresh', message: 'Current (0.2h ago)' },
+    { measurement_type: 'blood_oxygen', last_measured_at: '2026-11-14T08:00:00Z', hours_since_last: 0.2, expected_interval_hours: 6.0, status: 'fresh', message: 'Current (0.2h ago)' },
   ],
   'astro-003': [
-    {
-      measurement_type: 'blood_oxygen',
-      last_measured_at: '2026-11-13T12:00:00Z',
-      hours_since_last: 20.0,
-      expected_interval_hours: 6.0,
-      status: 'stale',
-      message: 'Telemetry stale (no telemetry received for 20.0h; nominal interval is <= 6.0h).',
-    },
+    { measurement_type: 'heart_rate', last_measured_at: '2026-11-14T08:00:00Z', hours_since_last: 0.2, expected_interval_hours: 6.0, status: 'fresh', message: 'Current (0.2h ago)' },
+    { measurement_type: 'blood_oxygen', last_measured_at: '2026-11-13T12:00:00Z', hours_since_last: 20.0, expected_interval_hours: 6.0, status: 'stale', message: 'Telemetry stale (20.0h elapsed)' },
+  ],
+  'astro-004': [
+    { measurement_type: 'heart_rate', last_measured_at: '2026-11-14T08:00:00Z', hours_since_last: 0.2, expected_interval_hours: 6.0, status: 'fresh', message: 'Current (0.2h ago)' },
+  ],
+  'astro-005': [
+    { measurement_type: 'heart_rate', last_measured_at: '2026-11-14T08:00:00Z', hours_since_last: 0.2, expected_interval_hours: 6.0, status: 'fresh', message: 'Current (0.2h ago)' },
   ],
 };
 
-/**
- * Realistic Explainable Health Assessments
- */
 export const DEMO_ASSESSMENTS: Record<string, AssessmentResponse[]> = {
   'astro-001': [
     {
@@ -516,7 +446,7 @@ export const DEMO_ASSESSMENTS: Record<string, AssessmentResponse[]> = {
           baseline_median: 68.0,
           robust_z: 0.34,
           trend: 'stable',
-          baseline_version: 2,
+          baseline_version: 1,
         },
         {
           measurement_type: 'blood_oxygen',
@@ -528,26 +458,6 @@ export const DEMO_ASSESSMENTS: Record<string, AssessmentResponse[]> = {
           trend: 'stable',
           baseline_version: 1,
         },
-        {
-          measurement_type: 'core_temperature',
-          status: 'nominal',
-          summary: 'core_temperature: Stable core thermoregulation within personal baseline range.',
-          current_value: 37.1,
-          baseline_median: 36.95,
-          robust_z: 0.51,
-          trend: 'stable',
-          baseline_version: 1,
-        },
-        {
-          measurement_type: 'radiation_dose',
-          status: 'nominal',
-          summary: 'radiation_dose: Habitat dosimetry within anticipated GCR transit boundaries.',
-          current_value: 0.052,
-          baseline_median: 0.045,
-          robust_z: 0.73,
-          trend: 'stable',
-          baseline_version: 1,
-        },
       ],
       guidance: [
         {
@@ -556,19 +466,44 @@ export const DEMO_ASSESSMENTS: Record<string, AssessmentResponse[]> = {
           rationale: 'All monitored vitals are operating within established intra-individual baselines.',
           is_medical_prescription: false,
         },
+      ],
+      baseline_versions_used: {
+        heart_rate: 'base-astro-001-hr-inflight (v1)',
+        blood_oxygen: 'base-astro-001-spo2-inflight (v1)',
+      },
+      data_quality_status: 'nominal',
+      is_synthetic: true,
+      created_at: '2026-11-14T08:00:00Z',
+    },
+  ],
+  'astro-002': [
+    {
+      id: 'asm-002-latest',
+      astronaut_id: 'astro-002',
+      assessment_date: '2026-11-14T08:00:00Z',
+      overall_classification: 'routine',
+      summary_explanation: "Nominal operational telemetry. Core vitals congruent with personal baseline parameters.",
+      findings: [
         {
-          category: 'clinical_primacy',
-          action: 'Cross-reference daily subjective wellness logs with biomedical telemetry.',
-          rationale: 'Normal telemetry values do not replace direct clinical communication or reported physical discomfort.',
+          measurement_type: 'heart_rate',
+          status: 'nominal',
+          summary: 'heart_rate: Within normal envelope.',
+          current_value: 73.0,
+          baseline_median: 72.0,
+          robust_z: 0.17,
+          trend: 'stable',
+          baseline_version: 1,
+        },
+      ],
+      guidance: [
+        {
+          category: 'telemetry_schedule',
+          action: 'Maintain nominal schedule.',
+          rationale: 'Baseline congruent.',
           is_medical_prescription: false,
         },
       ],
-      baseline_versions_used: {
-        heart_rate: 'base-001-hr-inflight (v2)',
-        blood_oxygen: 'base-001-spo2-inflight (v1)',
-        core_temperature: 'base-001-temp-inflight (v1)',
-        radiation_dose: 'base-001-rad-inflight (v1)',
-      },
+      baseline_versions_used: { heart_rate: 'base-astro-002-hr-inflight (v1)' },
       data_quality_status: 'nominal',
       is_synthetic: true,
       created_at: '2026-11-14T08:00:00Z',
@@ -581,7 +516,7 @@ export const DEMO_ASSESSMENTS: Record<string, AssessmentResponse[]> = {
       assessment_date: '2026-11-14T08:00:00Z',
       overall_classification: 'needs_attention',
       summary_explanation:
-        "Telemetry attention flag: blood_oxygen data is stale (20.0h elapsed vs 6.0h expected threshold). In addition, mild resting elevation observed in radiation flux.",
+        "Telemetry attention flag: blood_oxygen data is stale (20.0h elapsed vs 6.0h expected threshold). In addition, mild resting elevation observed in heart rate (|Z| = 2.02).",
       findings: [
         {
           measurement_type: 'blood_oxygen',
@@ -591,6 +526,16 @@ export const DEMO_ASSESSMENTS: Record<string, AssessmentResponse[]> = {
           baseline_median: 97.8,
           robust_z: null,
           trend: 'insufficient_data',
+          baseline_version: 1,
+        },
+        {
+          measurement_type: 'heart_rate',
+          status: 'elevated',
+          summary: 'heart_rate: Elevated above personal baseline envelope (|Z| = 2.02).',
+          current_value: 78.0,
+          baseline_median: 66.0,
+          robust_z: 2.02,
+          trend: 'increasing',
           baseline_version: 1,
         },
       ],
@@ -603,18 +548,60 @@ export const DEMO_ASSESSMENTS: Record<string, AssessmentResponse[]> = {
         },
       ],
       baseline_versions_used: {
-        blood_oxygen: 'base-003-spo2 (v1)',
+        blood_oxygen: 'base-astro-003-spo2-inflight (v1)',
+        heart_rate: 'base-astro-003-hr-inflight (v1)',
       },
       data_quality_status: 'degraded',
       is_synthetic: true,
       created_at: '2026-11-14T08:00:00Z',
     },
   ],
+  'astro-004': [
+    {
+      id: 'asm-004-latest',
+      astronaut_id: 'astro-004',
+      assessment_date: '2026-11-14T08:00:00Z',
+      overall_classification: 'routine',
+      summary_explanation: "Nominal operational telemetry. All monitored channels operating within established envelope.",
+      findings: [],
+      guidance: [
+        {
+          category: 'telemetry_schedule',
+          action: 'Maintain scheduled routine monitoring.',
+          rationale: 'Parameters nominal.',
+          is_medical_prescription: false,
+        },
+      ],
+      baseline_versions_used: {},
+      data_quality_status: 'nominal',
+      is_synthetic: true,
+      created_at: '2026-11-14T08:00:00Z',
+    },
+  ],
+  'astro-005': [
+    {
+      id: 'asm-005-latest',
+      astronaut_id: 'astro-005',
+      assessment_date: '2026-11-14T08:00:00Z',
+      overall_classification: 'routine',
+      summary_explanation: "Nominal operational telemetry for ISS Expedition 74 crew member.",
+      findings: [],
+      guidance: [
+        {
+          category: 'telemetry_schedule',
+          action: 'Maintain scheduled routine monitoring.',
+          rationale: 'Parameters nominal.',
+          is_medical_prescription: false,
+        },
+      ],
+      baseline_versions_used: {},
+      data_quality_status: 'nominal',
+      is_synthetic: true,
+      created_at: '2026-11-14T08:00:00Z',
+    },
+  ],
 };
 
-/**
- * Realistic Health Alerts (in-memory mutable for demo interactions)
- */
 export const DEMO_ALERTS: AlertResponse[] = [
   {
     id: 'alt-001',
