@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Table, Eye, Layers } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement, MeasurementType } from '../../types/measurement';
+import { BaselineResponse } from '../../types/baseline';
+import { TrendObservation } from '../../types/trend';
 import { TelemetryMetricCard } from './TelemetryMetricCard';
 import { MissionDayScrubber } from './MissionDayScrubber';
 import { TelemetryTimeSeriesChart } from '../charts/TelemetryTimeSeriesChart';
@@ -14,6 +16,8 @@ interface TelemetryStreamSectionProps {
   onSelectMetric: (metric: MeasurementType) => void;
   timeFilter: 'all' | '8h' | '24h';
   onTimeFilterChange: (filter: 'all' | '8h' | '24h') => void;
+  baselines?: BaselineResponse[];
+  trends?: TrendObservation[];
 }
 
 export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
@@ -23,6 +27,8 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
   onSelectMetric,
   timeFilter,
   onTimeFilterChange,
+  baselines = [],
+  trends = [],
 }) => {
   const [showRawTable, setShowRawTable] = useState(false);
 
@@ -36,6 +42,26 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
     });
     return map;
   }, [measurements]);
+
+  // Group baselines by metric
+  const baselineByMetric = useMemo(() => {
+    const map: Record<string, BaselineResponse> = {};
+    baselines.forEach((b) => {
+      if (b.is_active) {
+        map[b.measurement_type] = b;
+      }
+    });
+    return map;
+  }, [baselines]);
+
+  // Group trends by metric
+  const trendByMetric = useMemo(() => {
+    const map: Record<string, TrendObservation> = {};
+    trends.forEach((t) => {
+      map[t.measurement_type] = t;
+    });
+    return map;
+  }, [trends]);
 
   // Filter measurements by metric for the chart
   const filteredForChart = useMemo(() => {
@@ -57,13 +83,15 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 4 Metric Cards Row */}
+      {/* 4 Metric Cards Row with Baselines & Trend Velocity */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {coreMetricKeys.map((key) => (
           <TelemetryMetricCard
             key={key}
             measurementType={key}
             latestMeasurement={latestByMetric[key]}
+            baseline={baselineByMetric[key]}
+            trend={trendByMetric[key]}
             isActive={selectedMetric === key}
             onSelect={() => onSelectMetric(key)}
           />
@@ -119,46 +147,36 @@ export const TelemetryStreamSection: React.FC<TelemetryStreamSectionProps> = ({
             <table className="w-full text-left font-mono text-xs">
               <thead className="bg-space-900 sticky top-0 border-b border-space-700 text-space-400 text-[11px]">
                 <tr>
-                  <th className="p-2.5">TIMESTAMP (UTC)</th>
-                  <th className="p-2.5">METRIC</th>
-                  <th className="p-2.5">VALUE</th>
-                  <th className="p-2.5">QUALITY</th>
-                  <th className="p-2.5">PROVENANCE</th>
-                  <th className="p-2.5">SOURCE</th>
-                  <th className="p-2.5">OPERATIONAL CONTEXT</th>
+                  <th className="p-2">Timestamp (UTC)</th>
+                  <th className="p-2">Metric</th>
+                  <th className="p-2">Value</th>
+                  <th className="p-2">Unit</th>
+                  <th className="p-2">Quality</th>
+                  <th className="p-2">Provenance</th>
+                  <th className="p-2">Context</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-space-800 text-space-300">
-                {filteredForChart.map((record) => {
-                  const quality = formatDataQuality(record.data_quality);
-                  const provenance = formatProvenance(record.is_synthetic);
+              <tbody className="divide-y divide-space-800">
+                {filteredForChart.map((m) => {
+                  const q = formatDataQuality(m.data_quality);
+                  const p = formatProvenance(m.is_synthetic);
                   return (
-                    <tr key={record.id} className="hover:bg-space-800/50">
-                      <td className="p-2.5 whitespace-nowrap text-space-400">
-                        {formatTimestamp(record.measured_at)}
-                      </td>
-                      <td className="p-2.5 font-bold text-space-200">
-                        {record.measurement_type}
-                      </td>
-                      <td className="p-2.5 font-bold text-space-100 whitespace-nowrap">
-                        {record.value} {record.unit}
-                      </td>
-                      <td className="p-2.5 whitespace-nowrap">
-                        <span className={`px-1.5 py-0.5 rounded border text-[10px] ${quality.badgeClass}`}>
-                          {quality.label}
+                    <tr key={m.id} className="hover:bg-space-800/40 text-space-300">
+                      <td className="p-2 whitespace-nowrap">{formatTimestamp(m.measured_at)}</td>
+                      <td className="p-2 whitespace-nowrap">{m.measurement_type}</td>
+                      <td className="p-2 font-bold text-space-100">{m.value}</td>
+                      <td className="p-2 text-space-400">{m.unit}</td>
+                      <td className="p-2">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${q.badgeClass}`}>
+                          {q.label}
                         </span>
                       </td>
-                      <td className="p-2.5 whitespace-nowrap">
-                        <span className={`px-1.5 py-0.5 rounded border text-[10px] ${provenance.badgeClass}`}>
-                          {provenance.shortLabel}
+                      <td className="p-2">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${p.badgeClass}`}>
+                          {p.shortLabel}
                         </span>
                       </td>
-                      <td className="p-2.5 whitespace-nowrap text-space-400">
-                        {record.source}
-                      </td>
-                      <td className="p-2.5 text-space-400 truncate max-w-xs">
-                        {record.context || '—'}
-                      </td>
+                      <td className="p-2 text-space-400 truncate max-w-xs">{m.context || '—'}</td>
                     </tr>
                   );
                 })}

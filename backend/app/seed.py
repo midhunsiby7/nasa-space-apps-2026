@@ -7,112 +7,210 @@ actual astronaut medical records or official NASA clinical thresholds.
 """
 
 from datetime import datetime, timezone, timedelta
+import math
 import sys
 from sqlalchemy.orm import Session
 from app.database.connection import engine, SessionLocal
 from app.database.base import Base
 from app.models.astronaut import Astronaut
 from app.models.measurement import Measurement
+from app.models.baseline import AstronautBaseline
+from app.models.assessment import HealthAssessment
+from app.models.alert import HealthAlert
+from app.services.baseline_lifecycle_service import create_or_recalculate_lifecycle_baseline
+from app.services.assessment_service import synthesize_health_assessment
+
+
+SEEDED_ASTRONAUTS = [
+    {
+        "id": "astro-001",
+        "name": "Dr. Sarah Connor",
+        "crew_role": "Commander / Medical Officer",
+        "mission_name": "Artemis VII",
+        "mission_day": 42,
+    },
+    {
+        "id": "astro-002",
+        "name": "Alex Chen",
+        "crew_role": "Flight Engineer",
+        "mission_name": "Artemis VII",
+        "mission_day": 42,
+    },
+    {
+        "id": "astro-003",
+        "name": "Dr. Marcus Vance",
+        "crew_role": "Payload Specialist / Biologist",
+        "mission_name": "Mars Transit-1",
+        "mission_day": 184,
+    },
+    {
+        "id": "astro-004",
+        "name": "Elena Rostova",
+        "crew_role": "Pilot / Systems Specialist",
+        "mission_name": "Mars Transit-1",
+        "mission_day": 184,
+    },
+    {
+        "id": "astro-005",
+        "name": "Kenji Sato",
+        "crew_role": "Science Officer / Habitat Tech",
+        "mission_name": "ISS Expedition 74",
+        "mission_day": 96,
+    },
+]
 
 
 def seed_database():
-    """Seed the database with a fictional astronaut profile and synthetic telemetry."""
+    """Seed the database with fictional astronaut profiles, synthetic telemetry, baselines, and assessments."""
     print("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
 
     db: Session = SessionLocal()
     try:
-        # Check if seed astronaut already exists to ensure repeatability
-        fictional_id = "astro-001"
-        existing_astronaut = db.query(Astronaut).filter(Astronaut.id == fictional_id).first()
+        now = datetime.now(timezone.utc)
 
-        if existing_astronaut:
-            print(f"Seed astronaut '{fictional_id}' already exists. Skipping duplicate creation.")
-            astronaut = existing_astronaut
-        else:
-            print(f"Creating fictional astronaut '{fictional_id}'...")
-            astronaut = Astronaut(
-                id=fictional_id,
-                name="Alex Morgan",
-                crew_role="Mission Specialist",
-                mission_name="AURORA-1",
-                mission_day=45,
-                created_at=datetime.now(timezone.utc) - timedelta(days=45),
-            )
-            db.add(astronaut)
-            db.commit()
-            db.refresh(astronaut)
-            print(f"Created astronaut: {astronaut.name} ({astronaut.id})")
-
-        # Define synthetic telemetry series across mission day 45
-        # Generate time series measurements at multiple intervals
-        base_time = datetime.now(timezone.utc) - timedelta(hours=12)
-
-        telemetry_samples = [
-            # T - 12 hours (Sleep cycle)
-            ("meas-001", "heart_rate", 58.0, "bpm", base_time, "BioHarness Telemetry Band", "Deep sleep interval", "nominal"),
-            ("meas-002", "body_temperature", 36.6, "celsius", base_time, "Ingestible Thermal Core Sensor", "Deep sleep interval", "nominal"),
-            ("meas-003", "spo2", 98.5, "%", base_time, "Pulse Oximeter Optical Band", "Deep sleep interval", "nominal"),
-            ("meas-004", "respiratory_rate", 12.0, "breaths/min", base_time, "BioHarness Telemetry Band", "Deep sleep interval", "nominal"),
-            ("meas-005", "blood_pressure_systolic", 112.0, "mmHg", base_time, "Ambulatory Blood Pressure Cuff", "Deep sleep interval", "nominal"),
-            ("meas-006", "blood_pressure_diastolic", 72.0, "mmHg", base_time, "Ambulatory Blood Pressure Cuff", "Deep sleep interval", "nominal"),
-            ("meas-007", "sleep_duration", 7.4, "hours", base_time, "Sleep Staging Algorithm", "Consolidated night rest", "nominal"),
-
-            # T - 6 hours (Morning active cycle / prep)
-            ("meas-008", "heart_rate", 72.0, "bpm", base_time + timedelta(hours=6), "BioHarness Telemetry Band", "Morning cabin briefing", "nominal"),
-            ("meas-009", "body_temperature", 36.9, "celsius", base_time + timedelta(hours=6), "Ingestible Thermal Core Sensor", "Morning cabin briefing", "nominal"),
-            ("meas-010", "spo2", 98.2, "%", base_time + timedelta(hours=6), "Pulse Oximeter Optical Band", "Morning cabin briefing", "nominal"),
-            ("meas-011", "respiratory_rate", 14.0, "breaths/min", base_time + timedelta(hours=6), "BioHarness Telemetry Band", "Morning cabin briefing", "nominal"),
-            ("meas-012", "blood_pressure_systolic", 118.0, "mmHg", base_time + timedelta(hours=6), "Ambulatory Blood Pressure Cuff", "Morning cabin briefing", "nominal"),
-            ("meas-013", "blood_pressure_diastolic", 76.0, "mmHg", base_time + timedelta(hours=6), "Ambulatory Blood Pressure Cuff", "Morning cabin briefing", "nominal"),
-
-            # T - 2 hours (Exercise countermeasures)
-            ("meas-014", "heart_rate", 142.0, "bpm", base_time + timedelta(hours=10), "BioHarness Telemetry Band", "ARED resistive countermeasure exercise", "nominal"),
-            ("meas-015", "body_temperature", 37.4, "celsius", base_time + timedelta(hours=10), "Ingestible Thermal Core Sensor", "ARED resistive countermeasure exercise", "nominal"),
-            ("meas-016", "spo2", 97.8, "%", base_time + timedelta(hours=10), "Pulse Oximeter Optical Band", "ARED resistive countermeasure exercise", "nominal"),
-            ("meas-017", "respiratory_rate", 26.0, "breaths/min", base_time + timedelta(hours=10), "BioHarness Telemetry Band", "ARED resistive countermeasure exercise", "nominal"),
-            ("meas-018", "blood_pressure_systolic", 136.0, "mmHg", base_time + timedelta(hours=10), "Ambulatory Blood Pressure Cuff", "ARED resistive countermeasure exercise", "nominal"),
-            ("meas-019", "blood_pressure_diastolic", 82.0, "mmHg", base_time + timedelta(hours=10), "Ambulatory Blood Pressure Cuff", "ARED resistive countermeasure exercise", "nominal"),
-
-            # Current (Post-exercise nominal rest)
-            ("meas-020", "heart_rate", 68.0, "bpm", base_time + timedelta(hours=12), "BioHarness Telemetry Band", "Post-exercise recovery in habitat", "nominal"),
-            ("meas-021", "body_temperature", 36.8, "celsius", base_time + timedelta(hours=12), "Ingestible Thermal Core Sensor", "Post-exercise recovery in habitat", "nominal"),
-            ("meas-022", "spo2", 99.0, "%", base_time + timedelta(hours=12), "Pulse Oximeter Optical Band", "Post-exercise recovery in habitat", "nominal"),
-            ("meas-023", "respiratory_rate", 14.0, "breaths/min", base_time + timedelta(hours=12), "BioHarness Telemetry Band", "Post-exercise recovery in habitat", "nominal"),
-            ("meas-024", "blood_pressure_systolic", 116.0, "mmHg", base_time + timedelta(hours=12), "Ambulatory Blood Pressure Cuff", "Post-exercise recovery in habitat", "nominal"),
-            ("meas-025", "blood_pressure_diastolic", 74.0, "mmHg", base_time + timedelta(hours=12), "Ambulatory Blood Pressure Cuff", "Post-exercise recovery in habitat", "nominal"),
-        ]
-
-        inserted_count = 0
-        for (
-            m_id,
-            m_type,
-            m_val,
-            m_unit,
-            m_time,
-            m_src,
-            m_ctx,
-            m_quality,
-        ) in telemetry_samples:
-            existing_m = db.query(Measurement).filter(Measurement.id == m_id).first()
-            if not existing_m:
-                measurement = Measurement(
-                    id=m_id,
-                    astronaut_id=astronaut.id,
-                    measurement_type=m_type,
-                    value=m_val,
-                    unit=m_unit,
-                    measured_at=m_time,
-                    source=m_src,
-                    context=m_ctx,
-                    data_quality=m_quality,
-                    is_synthetic=True,  # Provenance strictly marked as synthetic
+        # 1. Seed Astronauts
+        for astro_data in SEEDED_ASTRONAUTS:
+            existing_astro = db.query(Astronaut).filter(Astronaut.id == astro_data["id"]).first()
+            if not existing_astro:
+                print(f"Creating astronaut '{astro_data['name']}' ({astro_data['id']})...")
+                astro = Astronaut(
+                    id=astro_data["id"],
+                    name=astro_data["name"],
+                    crew_role=astro_data["crew_role"],
+                    mission_name=astro_data["mission_name"],
+                    mission_day=astro_data["mission_day"],
+                    created_at=now - timedelta(days=astro_data["mission_day"]),
                 )
-                db.add(measurement)
-                inserted_count += 1
+                db.add(astro)
+            else:
+                existing_astro.name = astro_data["name"]
+                existing_astro.crew_role = astro_data["crew_role"]
+                existing_astro.mission_name = astro_data["mission_name"]
+                existing_astro.mission_day = astro_data["mission_day"]
 
         db.commit()
-        print(f"Seeding completed successfully: {inserted_count} new synthetic measurements added.")
+
+        # 2. Seed Multi-Day Telemetry Series for all astronauts
+        # 36 samples over the past 9 days at 6-hour intervals in 'resting_cabin'
+        new_measurements_count = 0
+        for astro in SEEDED_ASTRONAUTS:
+            a_id = astro["id"]
+            for step in range(36):
+                sample_time = now - timedelta(hours=(36 - step) * 6)
+                t_idx = step
+
+                # Base heart rate around 68-72 bpm
+                hr_val = round(70.0 + math.sin(t_idx * 0.4) * 6.0 + (3.0 if a_id == "astro-003" and step > 28 else 0.0), 1)
+                m_hr_id = f"meas-{a_id}-hr-{step:03d}"
+                if not db.query(Measurement).filter(Measurement.id == m_hr_id).first():
+                    db.add(Measurement(
+                        id=m_hr_id,
+                        astronaut_id=a_id,
+                        measurement_type="heart_rate",
+                        value=hr_val,
+                        unit="bpm",
+                        measured_at=sample_time,
+                        source="BioHarness v3 Telemetry Stream",
+                        context="resting_cabin",
+                        data_quality="nominal",
+                        is_synthetic=True,
+                    ))
+                    new_measurements_count += 1
+
+                # Body temperature around 36.8 - 37.1 C
+                temp_val = round(36.9 + math.sin(t_idx * 0.3) * 0.25, 2)
+                m_temp_id = f"meas-{a_id}-temp-{step:03d}"
+                if not db.query(Measurement).filter(Measurement.id == m_temp_id).first():
+                    db.add(Measurement(
+                        id=m_temp_id,
+                        astronaut_id=a_id,
+                        measurement_type="body_temperature",
+                        value=temp_val,
+                        unit="celsius",
+                        measured_at=sample_time,
+                        source="Ingestible Core Sensor Capsule",
+                        context="resting_cabin",
+                        data_quality="nominal",
+                        is_synthetic=True,
+                    ))
+                    new_measurements_count += 1
+
+                # Blood oxygen around 97.5 - 99.0 %
+                spo2_val = round(98.2 + math.cos(t_idx * 0.2) * 0.6, 1)
+                m_spo2_id = f"meas-{a_id}-spo2-{step:03d}"
+                if not db.query(Measurement).filter(Measurement.id == m_spo2_id).first():
+                    db.add(Measurement(
+                        id=m_spo2_id,
+                        astronaut_id=a_id,
+                        measurement_type="spo2",
+                        value=spo2_val,
+                        unit="%",
+                        measured_at=sample_time,
+                        source="Optical Pulse Oximeter",
+                        context="resting_cabin",
+                        data_quality="nominal",
+                        is_synthetic=True,
+                    ))
+                    new_measurements_count += 1
+
+                # Blood pressure systolic (114 - 122 mmHg)
+                sbp_val = round(118.0 + math.sin(t_idx * 0.35) * 4.0, 1)
+                m_sbp_id = f"meas-{a_id}-sbp-{step:03d}"
+                if not db.query(Measurement).filter(Measurement.id == m_sbp_id).first():
+                    db.add(Measurement(
+                        id=m_sbp_id,
+                        astronaut_id=a_id,
+                        measurement_type="blood_pressure_systolic",
+                        value=sbp_val,
+                        unit="mmHg",
+                        measured_at=sample_time,
+                        source="Ambulatory Blood Pressure Monitor",
+                        context="resting_cabin",
+                        data_quality="nominal",
+                        is_synthetic=True,
+                    ))
+                    new_measurements_count += 1
+
+        db.commit()
+        print(f"Seeded {new_measurements_count} new synthetic measurement records.")
+
+        # 3. Calculate Baselines for all astronauts
+        print("Calculating intra-individual baselines...")
+        metrics_to_baseline = ["heart_rate", "body_temperature", "spo2", "blood_pressure_systolic"]
+        for astro in SEEDED_ASTRONAUTS:
+            a_id = astro["id"]
+            for m_type in metrics_to_baseline:
+                try:
+                    create_or_recalculate_lifecycle_baseline(
+                        db=db,
+                        astronaut_id=a_id,
+                        measurement_type=m_type,
+                        baseline_type="inflight",
+                        context="resting_cabin",
+                    )
+                except Exception as b_err:
+                    print(f"Note: Baseline {m_type} for {a_id}: {b_err}")
+
+        db.commit()
+
+        # 4. Generate Explainable Assessments and Alerts
+        print("Generating explainable health assessments and operational alerts...")
+        for astro in SEEDED_ASTRONAUTS:
+            a_id = astro["id"]
+            try:
+                synthesize_health_assessment(
+                    db=db,
+                    astronaut_id=a_id,
+                    context="resting_cabin",
+                    lookback_hours=72,
+                    generate_alerts=True,
+                )
+            except Exception as a_err:
+                print(f"Note: Assessment for {a_id}: {a_err}")
+
+        db.commit()
+        print("Seeding completed successfully with astronauts, telemetry, baselines, assessments, and alerts.")
 
     except Exception as e:
         db.rollback()
