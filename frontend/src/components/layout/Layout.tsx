@@ -12,10 +12,14 @@ interface LayoutProps {
   astronauts: Astronaut[];
   selectedAstronautId: string | null;
   onSelectAstronaut: (id: string) => void;
+  availableMetrics: string[];
   selectedMetric: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   connectionState: ConnectionState;
   onOpenProvenanceGuide: () => void;
+  onRetryConnection: () => void;
+  onToggleDemoMode: () => void;
+  isDemoMode: boolean;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -25,16 +29,23 @@ export const Layout: React.FC<LayoutProps> = ({
   astronauts,
   selectedAstronautId,
   onSelectAstronaut,
+  availableMetrics,
   selectedMetric,
   onSelectMetric,
   connectionState,
   onOpenProvenanceGuide,
+  onRetryConnection,
+  onToggleDemoMode,
+  isDemoMode,
 }) => {
   return (
     <div className="flex min-h-screen flex-col bg-space-950 text-space-100">
       <Header
         connectionState={connectionState}
         onOpenProvenanceGuide={onOpenProvenanceGuide}
+        onRetryConnection={onRetryConnection}
+        onToggleDemoMode={onToggleDemoMode}
+        isDemoMode={isDemoMode}
       />
       <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
         <Sidebar
@@ -43,6 +54,7 @@ export const Layout: React.FC<LayoutProps> = ({
           astronauts={astronauts}
           selectedAstronautId={selectedAstronautId}
           onSelectAstronaut={onSelectAstronaut}
+          availableMetrics={availableMetrics}
           selectedMetric={selectedMetric}
           onSelectMetric={onSelectMetric}
         />
