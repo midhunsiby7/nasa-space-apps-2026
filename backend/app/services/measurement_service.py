@@ -5,22 +5,39 @@ from typing import List, Optional, Tuple
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.measurement import Measurement
+from app.catalog.definitions import get_query_expansion_types
 
 
 def list_measurements_for_astronaut(
     db: Session,
     astronaut_id: str,
     measurement_type: Optional[str] = None,
+    context: Optional[str] = None,
+    exercise_modality: Optional[str] = None,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> Tuple[List[Measurement], int]:
-    """Retrieve filtered, paginated telemetry measurements for an astronaut."""
+    """Retrieve filtered, paginated telemetry measurements for an astronaut.
+
+    Includes alias-expansion query resolution (e.g. blood_oxygen <-> spo2),
+    while preserving strict separation between body_temperature and core_temperature.
+    """
     base_query = select(Measurement).where(Measurement.astronaut_id == astronaut_id)
 
     if measurement_type:
-        base_query = base_query.where(Measurement.measurement_type == measurement_type.strip())
+        expansion_types = get_query_expansion_types(measurement_type.strip())
+        if len(expansion_types) == 1:
+            base_query = base_query.where(Measurement.measurement_type == expansion_types[0])
+        else:
+            base_query = base_query.where(Measurement.measurement_type.in_(expansion_types))
+
+    if context:
+        base_query = base_query.where(Measurement.context == context.strip())
+
+    if exercise_modality:
+        base_query = base_query.where(Measurement.exercise_modality == exercise_modality.strip())
 
     if start_time:
         base_query = base_query.where(Measurement.measured_at >= start_time)

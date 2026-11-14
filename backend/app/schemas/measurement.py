@@ -16,6 +16,13 @@ class MeasurementBase(BaseModel):
     data_quality: str = Field("nominal", max_length=32, description="Quality indicator")
     is_synthetic: bool = Field(True, description="Provenance flag: True for synthetic, False for empirical")
 
+    # Phase 2A Comparability and Context Metadata
+    exercise_modality: Optional[str] = Field(None, max_length=64, description="Exercise hardware modality (e.g. ared_resistive, cevis_aerobic, t2_treadmill)")
+    measurement_site: Optional[str] = Field(None, max_length=64, description="Anatomical site of measurement (e.g. chest, finger, axillary)")
+    measurement_method: Optional[str] = Field(None, max_length=64, description="Measurement technique or protocol")
+    sensor_model: Optional[str] = Field(None, max_length=64, description="Hardware or sensor model designation")
+    mission_day: Optional[int] = Field(None, description="Mission elapsed day (MET/Flight Day)")
+
 
 class MeasurementCreate(MeasurementBase):
     """Schema for internal measurement creation/seeding."""

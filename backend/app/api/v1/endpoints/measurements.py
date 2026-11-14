@@ -9,6 +9,13 @@ from app.core.exceptions import AstronautNotFoundException, InvalidQueryParamete
 from app.schemas.measurement import MeasurementListResponse
 from app.services.astronaut_service import get_astronaut
 from app.services.measurement_service import list_measurements_for_astronaut
+from app.catalog import (
+    MEASUREMENT_CATALOG,
+    BASELINE_ELIGIBLE_CONTEXTS,
+    OPERATIONAL_TRACKING_CONTEXTS,
+    EXCLUDED_CONTEXTS,
+    ALL_EXERCISE_MODALITIES,
+)
 
 router = APIRouter(tags=["measurements"])
 
@@ -26,10 +33,26 @@ def parse_iso_datetime(value: str, param_name: str) -> datetime:
         )
 
 
+@router.get("/measurements/catalog")
+def get_measurement_catalog() -> dict:
+    """Retrieve canonical measurement catalog, context taxonomy, and exercise modalities."""
+    return {
+        "metrics": [entry.model_dump() for entry in MEASUREMENT_CATALOG.values()],
+        "contexts": {
+            "baseline_eligible": sorted(list(BASELINE_ELIGIBLE_CONTEXTS)),
+            "operational_tracking": sorted(list(OPERATIONAL_TRACKING_CONTEXTS)),
+            "excluded": sorted(list(EXCLUDED_CONTEXTS)),
+        },
+        "exercise_modalities": sorted(list(ALL_EXERCISE_MODALITIES)),
+    }
+
+
 @router.get("/astronauts/{astronaut_id}/measurements", response_model=MeasurementListResponse)
 def get_astronaut_measurements(
     astronaut_id: str = Path(..., description="Unique identifier of the astronaut"),
-    measurement_type: Optional[str] = Query(None, description="Filter by metric type (e.g., heart_rate)"),
+    measurement_type: Optional[str] = Query(None, description="Filter by metric type (e.g., heart_rate, spo2)"),
+    context: Optional[str] = Query(None, description="Filter by context (e.g., resting_cabin, sleep_cycle, exercise_active)"),
+    exercise_modality: Optional[str] = Query(None, description="Filter by exercise modality (e.g., ared_resistive, cevis_aerobic, t2_treadmill)"),
     start_time: Optional[str] = Query(None, description="Filter measurements on/after this ISO 8601 timestamp"),
     end_time: Optional[str] = Query(None, description="Filter measurements on/before this ISO 8601 timestamp"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return (1-1000)"),
@@ -56,6 +79,8 @@ def get_astronaut_measurements(
         db=db,
         astronaut_id=astronaut_id,
         measurement_type=measurement_type,
+        context=context,
+        exercise_modality=exercise_modality,
         start_time=parsed_start,
         end_time=parsed_end,
         limit=limit,
