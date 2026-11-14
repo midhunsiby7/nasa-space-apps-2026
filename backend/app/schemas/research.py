@@ -44,6 +44,8 @@ class ResearchStudyBase(BaseModel):
     publication_citation: Optional[str] = Field(None, description="Primary peer-reviewed literature citation")
     official_url: Optional[str] = Field(None, description="Official NASA OSDR portal URL")
     is_synthetic: bool = Field(False, description="Provenance indicator: False for empirical research")
+    provenance_type: str = Field("NASA_OSDR_CURATED", description="Data provenance origin classification")
+    limitations: Optional[str] = Field(None, description="Explicit scientific limitations and translation caveats")
     created_at: Optional[str] = Field(None, description="Repository indexing timestamp in UTC ISO format")
 
     @field_validator("accession")

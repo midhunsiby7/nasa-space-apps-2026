@@ -59,6 +59,23 @@ def test_valid_catalogue_loading():
     assert study.evidence_category == EvidenceCategory.HUMAN_SPACEFLIGHT
     assert study.relevance == ResearchRelevance.HIGH
     assert study.is_synthetic is False
+    assert study.provenance_type == "NASA_OSDR_CURATED"
+    assert study.limitations is not None
+
+    # Verify specific scientific corrections
+    study_254 = repo.get_study_by_accession("OSD-254")
+    assert "dorsal skin" in study_254.title.lower()
+    assert study_254.body_systems == ["integumentary"]
+    assert "sleep_circadian" not in study_254.body_systems
+
+    study_63 = repo.get_study_by_accession("OSD-63")
+    assert "mammary" in study_63.description.lower()
+    assert "sleep_circadian" not in study_63.body_systems
+
+    study_984 = repo.get_study_by_accession("OSD-984")
+    assert "metabolic proteins" in study_984.title.lower()
+    assert "musculoskeletal" in study_984.body_systems
+    assert "hematopoietic" not in study_984.description.lower()
 
 
 # --- 2. Missing Catalogue Handling ---
@@ -420,9 +437,10 @@ def test_operational_measurement_isolation(client):
     for m in metrics:
         assert not m["canonical_identifier"].startswith("OSD-")
 
-    # 3. Check research endpoints return strictly empirical studies (is_synthetic = False)
+    # 3. Check research endpoints return strictly empirical studies (is_synthetic = False, provenance = NASA_OSDR_CURATED)
     research_resp = client.get("/api/v1/research/studies")
     assert research_resp.status_code == 200
     for s in research_resp.json()["data"]:
         assert s["is_synthetic"] is False
+        assert s["provenance_type"] == "NASA_OSDR_CURATED"
         assert s["accession"].startswith("OSD-")
