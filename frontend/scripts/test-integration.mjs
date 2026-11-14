@@ -19,6 +19,14 @@ const BACKEND_DIR = path.resolve(__dirname, '../../backend');
 const TEST_DB_FILE = path.resolve(BACKEND_DIR, 'test_cosmolookup_isolated.db');
 const TEST_DB_URL = 'sqlite:///./test_cosmolookup_isolated.db';
 
+const PYTHON_BIN = (() => {
+  const winVenv = path.join(BACKEND_DIR, '.venv', 'Scripts', 'python.exe');
+  if (fs.existsSync(winVenv)) return winVenv;
+  const nixVenv = path.join(BACKEND_DIR, '.venv', 'bin', 'python');
+  if (fs.existsSync(nixVenv)) return nixVenv;
+  return 'python';
+})();
+
 let backendProcess = null;
 
 async function sleep(ms) {
@@ -50,7 +58,7 @@ async function startBackend() {
 
   console.log('[TEST SETUP] Executing backend seed on isolated database...');
   try {
-    execSync('python -c "from app.seed import seed_database; seed_database()"', {
+    execSync(`"${PYTHON_BIN}" -c "from app.seed import seed_database; seed_database()"`, {
       cwd: BACKEND_DIR,
       env,
       stdio: 'inherit',
@@ -78,7 +86,7 @@ async function startBackend() {
       "print('Synthetic fixtures successfully seeded.')",
     ].join('; ');
 
-    execSync(`python -c "${fixtureCode}"`, {
+    execSync(`"${PYTHON_BIN}" -c "${fixtureCode}"`, {
       cwd: BACKEND_DIR,
       env,
       stdio: 'inherit',
@@ -89,7 +97,7 @@ async function startBackend() {
   }
 
   console.log('[TEST SETUP] Spawning local FastAPI backend server on port 8000 with isolated DB...');
-  backendProcess = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--port', '8000'], {
+  backendProcess = spawn(PYTHON_BIN, ['-m', 'uvicorn', 'app.main:app', '--port', '8000'], {
     cwd: BACKEND_DIR,
     env,
     stdio: 'ignore',
