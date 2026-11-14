@@ -8,6 +8,8 @@ import { AstronautDirectory } from './components/astronaut/AstronautDirectory';
 import { AstronautProfileModal } from './components/astronaut/AstronautProfileModal';
 import { TelemetryStreamSection } from './components/telemetry/TelemetryStreamSection';
 import { AnatomyViewport } from './components/anatomy/AnatomyViewport';
+import { PersonalBaselinesView } from './components/baselines/PersonalBaselinesView';
+import { MeasurementCatalogView } from './components/catalog/MeasurementCatalogView';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ErrorMessage } from './components/common/ErrorMessage';
 import { Astronaut } from './types/astronaut';
@@ -49,63 +51,53 @@ export const App: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // Initial health check & data fetch
-  const initialize = useCallback(async () => {
-    await apiClient.checkHealth();
-  }, []);
-
-  useEffect(() => {
-    initialize();
-  }, [initialize]);
-
   // Fetch Astronauts List
   const fetchAstronauts = useCallback(async () => {
     setIsLoadingAstronauts(true);
     setAstronautsError(null);
     try {
-      const response = await apiClient.getAstronauts({ limit: 100 });
+      const response = await apiClient.getAstronauts({ limit: 50 });
       setAstronauts(response.data);
       setTotalAstronauts(response.total);
 
-      // Default select the first astronaut if none selected
+      // Auto-select first astronaut if none selected
       if (response.data.length > 0 && !selectedAstronautId) {
         setSelectedAstronautId(response.data[0].id);
       }
     } catch (err: any) {
-      if (err instanceof ApiError) {
-        setAstronautsError(err);
-      } else {
-        setAstronautsError(new ApiError(err?.message || 'Unknown network error', 'UNKNOWN_ERROR', 0));
-      }
+      setAstronautsError(err);
     } finally {
       setIsLoadingAstronauts(false);
     }
   }, [selectedAstronautId]);
 
+  // Initial Health Check & Astronaut Fetch
   useEffect(() => {
-    fetchAstronauts();
-  }, [fetchAstronauts, isDemoMode]);
+    const init = async () => {
+      await apiClient.checkHealth();
+      await fetchAstronauts();
+    };
+    init();
+  }, [fetchAstronauts]);
 
-  // Fetch Measurements for Selected Astronaut
+  // Fetch Measurements when selected astronaut changes
   const fetchMeasurements = useCallback(async (astronautId: string) => {
     setIsLoadingMeasurements(true);
     setMeasurementsError(null);
     try {
-      const response = await apiClient.getMeasurements(astronautId, { limit: 1000 });
+      const response = await apiClient.getMeasurements(astronautId, { limit: 500 });
       setMeasurements(response.data);
       setTotalMeasurements(response.total);
 
-      // Check if selectedMetric is in the fetched data; if not, select the first available
-      const types = Array.from(new Set(response.data.map((m) => m.measurement_type)));
-      if (types.length > 0 && !types.includes(selectedMetric)) {
-        setSelectedMetric(types[0]);
+      // Reconcile available metrics from actual data
+      const metricsInDataset = Array.from(new Set(response.data.map((m) => m.measurement_type)));
+      if (metricsInDataset.length > 0 && !metricsInDataset.includes(selectedMetric)) {
+        setSelectedMetric(metricsInDataset[0]);
       }
     } catch (err: any) {
-      if (err instanceof ApiError) {
-        setMeasurementsError(err);
-      } else {
-        setMeasurementsError(new ApiError(err?.message || 'Failed to retrieve telemetry', 'MEASUREMENT_FETCH_ERROR', 0));
-      }
+      setMeasurementsError(err);
+      setMeasurements([]);
+      setTotalMeasurements(0);
     } finally {
       setIsLoadingMeasurements(false);
     }
@@ -115,40 +107,23 @@ export const App: React.FC = () => {
     if (selectedAstronautId) {
       fetchMeasurements(selectedAstronautId);
     }
-  }, [selectedAstronautId, fetchMeasurements, isDemoMode]);
+  }, [selectedAstronautId, fetchMeasurements]);
 
-  // Dynamically derive available metrics from loaded measurements
-  const availableMetrics = useMemo(() => {
-    const types = Array.from(new Set(measurements.map((m) => m.measurement_type)));
-    // Sort in consistent logical order: heart_rate, spo2, body_temperature, respiratory_rate, etc.
-    const priority = [
-      'heart_rate',
-      'spo2',
-      'body_temperature',
-      'respiratory_rate',
-      'blood_pressure_systolic',
-      'blood_pressure_diastolic',
-      'sleep_duration',
-    ];
-
-    types.sort((a, b) => {
-      const idxA = priority.indexOf(a);
-      const idxB = priority.indexOf(b);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return a.localeCompare(b);
-    });
-
-    return types;
-  }, [measurements]);
-
-  // Selected astronaut record
+  // Selected astronaut object
   const selectedAstronaut = useMemo(() => {
     return astronauts.find((a) => a.id === selectedAstronautId) || null;
   }, [astronauts, selectedAstronautId]);
 
-  // Latest measurements grouped by type for quick banner
+  // Available unique metric types from loaded measurements
+  const availableMetrics = useMemo(() => {
+    if (measurements.length === 0) {
+      return ['heart_rate', 'spo2', 'body_temperature', 'respiratory_rate'];
+    }
+    const set = new Set(measurements.map((m) => m.measurement_type));
+    return Array.from(set);
+  }, [measurements]);
+
+  // Latest measurements map per metric for the selected astronaut banner
   const latestMeasurementsMap = useMemo(() => {
     const map: Record<string, Measurement> = {};
     measurements.forEach((m) => {
@@ -159,12 +134,14 @@ export const App: React.FC = () => {
     return map;
   }, [measurements]);
 
-  // Dynamic time filtering without hardcoded dates
+  // Filtered measurements by time range
   const filteredMeasurements = useMemo(() => {
-    if (timeFilter === 'all' || measurements.length === 0) return measurements;
+    if (timeFilter === 'all') return measurements;
 
-    // Anchor the time window against the most recent measurement timestamp in the dataset
-    const timestamps = measurements.map((m) => new Date(m.measured_at).getTime()).filter((t) => !isNaN(t));
+    const timestamps = measurements
+      .map((m) => new Date(m.measured_at).getTime())
+      .filter((t) => !isNaN(t));
+
     if (timestamps.length === 0) return measurements;
 
     const maxTime = Math.max(...timestamps);
@@ -208,8 +185,8 @@ export const App: React.FC = () => {
       isDemoMode={isDemoMode}
     >
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Selected Astronaut Status Banner (shown on Telemetry and Anatomy views) */}
-        {selectedAstronaut && activeTab !== 'roster' && (
+        {/* Selected Astronaut Status Banner (shown on Telemetry, Baselines, and Anatomy views) */}
+        {selectedAstronaut && activeTab !== 'roster' && activeTab !== 'catalog' && (
           <SelectedAstronautBanner
             astronaut={selectedAstronaut}
             latestMeasurements={latestMeasurementsMap}
@@ -222,7 +199,7 @@ export const App: React.FC = () => {
           <LoadingSpinner label="Querying COSMOLOOKUP Spaceflight Roster..." size="lg" />
         )}
 
-        {/* Global Error for Astronauts with distinction between Network and 404/400 */}
+        {/* Global Error for Astronauts */}
         {astronautsError && !isLoadingAstronauts && (
           <ErrorMessage
             title={`Error [${astronautsError.code}]`}
@@ -246,6 +223,8 @@ export const App: React.FC = () => {
                 onExploreRoster={() => setActiveTab('roster')}
                 onViewTelemetry={() => setActiveTab('telemetry')}
                 onOpenAnatomy={() => setActiveTab('anatomy')}
+                onOpenBaselines={() => setActiveTab('baselines')}
+                onOpenCatalog={() => setActiveTab('catalog')}
               />
             )}
 
@@ -281,9 +260,36 @@ export const App: React.FC = () => {
                     onSelectMetric={setSelectedMetric}
                     timeFilter={timeFilter}
                     onTimeFilterChange={setTimeFilter}
+                    onNavigateToBaselines={(metric) => {
+                      setSelectedMetric(metric);
+                      setActiveTab('baselines');
+                    }}
                   />
                 )}
               </>
+            )}
+
+            {activeTab === 'baselines' && (
+              <PersonalBaselinesView
+                astronaut={selectedAstronaut}
+                measurements={measurements}
+                selectedMetric={selectedMetric}
+                onSelectMetric={setSelectedMetric}
+                onNavigateToTelemetry={(metric) => {
+                  setSelectedMetric(metric);
+                  setActiveTab('telemetry');
+                }}
+                onNavigateToAnatomy={() => setActiveTab('anatomy')}
+              />
+            )}
+
+            {activeTab === 'catalog' && (
+              <MeasurementCatalogView
+                onSelectMetricToInspect={(metricId) => {
+                  setSelectedMetric(metricId);
+                  setActiveTab('telemetry');
+                }}
+              />
             )}
 
             {activeTab === 'anatomy' && (
@@ -293,6 +299,10 @@ export const App: React.FC = () => {
                 selectedMetric={selectedMetric}
                 onSelectMetric={setSelectedMetric}
                 onSwitchToChart={() => setActiveTab('telemetry')}
+                onNavigateToBaselines={(metric) => {
+                  setSelectedMetric(metric);
+                  setActiveTab('baselines');
+                }}
               />
             )}
           </>

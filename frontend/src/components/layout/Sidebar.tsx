@@ -5,12 +5,14 @@ import {
   LineChart,
   UserCheck,
   Activity,
+  TrendingUp,
+  BookOpen,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { MeasurementType } from '../../types/measurement';
 import { getMetricMeta } from '../../utils/formatters';
 
-export type ActiveTab = 'dashboard' | 'roster' | 'telemetry' | 'anatomy';
+export type ActiveTab = 'dashboard' | 'roster' | 'telemetry' | 'baselines' | 'catalog' | 'anatomy';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -46,8 +48,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'telemetry',
-      label: 'Telemetry Stream',
+      label: 'Telemetry Explorer',
       icon: <LineChart className="h-4 w-4" />,
+    },
+    {
+      id: 'baselines',
+      label: 'Personal Baselines',
+      icon: <TrendingUp className="h-4 w-4" />,
+    },
+    {
+      id: 'catalog',
+      label: 'Measurement Catalog',
+      icon: <BookOpen className="h-4 w-4" />,
     },
     {
       id: 'anatomy',

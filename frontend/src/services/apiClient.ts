@@ -1,5 +1,11 @@
 import { Astronaut, AstronautListResponse } from '../types/astronaut';
 import { MeasurementListResponse } from '../types/measurement';
+import { MeasurementCatalogResponse } from '../types/catalog';
+import {
+  BaselineResponse,
+  BaselineListResponse,
+  BaselineCalculationRequest,
+} from '../types/baseline';
 import {
   ListAstronautsParams,
   GetMeasurementsParams,
@@ -8,7 +14,7 @@ import {
   ApiErrorResponse,
   HealthCheckResponse,
 } from '../types/api';
-import { DEMO_ASTRONAUTS, DEMO_MEASUREMENTS } from './demoData';
+import { DEMO_ASTRONAUTS, DEMO_MEASUREMENTS, DEMO_CATALOG, DEMO_BASELINES } from './demoData';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
 const REQUEST_TIMEOUT_MS = 5000;
@@ -65,6 +71,7 @@ class ApiClient {
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
+          'Content-Type': options.body ? 'application/json' : undefined as any,
           ...(options.headers || {}),
         },
       });
@@ -96,7 +103,6 @@ class ApiClient {
 
       // Distinguish between explicit HTTP ApiErrors and Network/Timeout errors
       if (err instanceof ApiError) {
-        // Server was reached and actively returned 4xx or 5xx
         throw err;
       }
 
@@ -135,10 +141,27 @@ class ApiClient {
   }
 
   /**
+   * GET /api/v1/measurements/catalog
+   */
+  public async getMeasurementCatalog(): Promise<MeasurementCatalogResponse> {
+    if (this.demoModeEnabled) {
+      return DEMO_CATALOG;
+    }
+
+    try {
+      return await this.request<MeasurementCatalogResponse>('/measurements/catalog');
+    } catch (err: any) {
+      if (err.statusCode === 0 && this.demoModeEnabled) {
+        return DEMO_CATALOG;
+      }
+      throw err;
+    }
+  }
+
+  /**
    * GET /api/v1/astronauts
    */
   public async getAstronauts(params?: ListAstronautsParams): Promise<AstronautListResponse> {
-    // If user explicitly enabled offline demonstration mode, return demo dataset immediately
     if (this.demoModeEnabled) {
       return this.getDemoAstronauts(params);
     }
@@ -154,7 +177,6 @@ class ApiClient {
     try {
       return await this.request<AstronautListResponse>(endpoint);
     } catch (err: any) {
-      // If network is offline and demo mode is permitted as fallback
       if (err.statusCode === 0 && this.demoModeEnabled) {
         return this.getDemoAstronauts(params);
       }
@@ -201,6 +223,8 @@ class ApiClient {
 
     const query = new URLSearchParams();
     if (params?.measurement_type) query.set('measurement_type', params.measurement_type);
+    if (params?.context) query.set('context', params.context);
+    if (params?.exercise_modality) query.set('exercise_modality', params.exercise_modality);
     if (params?.start_time) query.set('start_time', params.start_time);
     if (params?.end_time) query.set('end_time', params.end_time);
     if (params?.limit !== undefined) query.set('limit', params.limit.toString());
@@ -217,6 +241,118 @@ class ApiClient {
       }
       throw err;
     }
+  }
+
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/baselines
+   */
+  public async getAstronautBaselines(
+    astronautId: string,
+    context?: string
+  ): Promise<BaselineListResponse> {
+    if (this.demoModeEnabled) {
+      const all = DEMO_BASELINES[astronautId] || [];
+      const filtered = context ? all.filter((b) => b.context === context) : all;
+      return {
+        astronaut_id: astronautId,
+        data: filtered,
+        total: filtered.length,
+      };
+    }
+
+    const query = new URLSearchParams();
+    if (context) query.set('context', context);
+    const qs = query.toString();
+    const endpoint = `/astronauts/${encodeURIComponent(astronautId)}/baselines${qs ? `?${qs}` : ''}`;
+
+    try {
+      return await this.request<BaselineListResponse>(endpoint);
+    } catch (err: any) {
+      if (err.statusCode === 0 && this.demoModeEnabled) {
+        const all = DEMO_BASELINES[astronautId] || [];
+        const filtered = context ? all.filter((b) => b.context === context) : all;
+        return {
+          astronaut_id: astronautId,
+          data: filtered,
+          total: filtered.length,
+        };
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * GET /api/v1/astronauts/{astronaut_id}/baselines/{measurement_type}
+   */
+  public async getAstronautBaselineByType(
+    astronautId: string,
+    measurementType: string,
+    context?: string,
+    exerciseModality?: string
+  ): Promise<BaselineResponse> {
+    if (this.demoModeEnabled) {
+      const all = DEMO_BASELINES[astronautId] || [];
+      const found = all.find(
+        (b) =>
+          b.measurement_type === measurementType &&
+          (!context || b.context === context) &&
+          (!exerciseModality || b.exercise_modality === exerciseModality)
+      );
+      if (found) return found;
+      throw new ApiError(
+        `Baseline for astronaut '${astronautId}', metric '${measurementType}' not found in demo data.`,
+        'BASELINE_NOT_FOUND',
+        404
+      );
+    }
+
+    const query = new URLSearchParams();
+    if (context) query.set('context', context);
+    if (exerciseModality) query.set('exercise_modality', exerciseModality);
+    const qs = query.toString();
+    const endpoint = `/astronauts/${encodeURIComponent(astronautId)}/baselines/${encodeURIComponent(measurementType)}${qs ? `?${qs}` : ''}`;
+
+    try {
+      return await this.request<BaselineResponse>(endpoint);
+    } catch (err: any) {
+      if (err.statusCode === 0 && this.demoModeEnabled) {
+        const all = DEMO_BASELINES[astronautId] || [];
+        const found = all.find(
+          (b) =>
+            b.measurement_type === measurementType &&
+            (!context || b.context === context) &&
+            (!exerciseModality || b.exercise_modality === exerciseModality)
+        );
+        if (found) return found;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * POST /api/v1/astronauts/{astronaut_id}/baselines/calculate
+   */
+  public async calculateAstronautBaseline(
+    astronautId: string,
+    payload: BaselineCalculationRequest
+  ): Promise<BaselineResponse> {
+    if (this.demoModeEnabled) {
+      // Return matching demo baseline or synthetic calculated envelope
+      const all = DEMO_BASELINES[astronautId] || [];
+      const found = all.find((b) => b.measurement_type === payload.measurement_type);
+      if (found) return found;
+      throw new ApiError(
+        `Insufficient measurements to calculate demo baseline for ${payload.measurement_type}.`,
+        'INSUFFICIENT_MEASUREMENTS',
+        422
+      );
+    }
+
+    const endpoint = `/astronauts/${encodeURIComponent(astronautId)}/baselines/calculate`;
+    return await this.request<BaselineResponse>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 
   /* Synthetic Demo Handlers strictly matching API schemas */
@@ -248,6 +384,14 @@ class ApiClient {
 
     if (params?.measurement_type) {
       records = records.filter((m) => m.measurement_type === params.measurement_type);
+    }
+
+    if (params?.context) {
+      records = records.filter((m) => m.context === params.context);
+    }
+
+    if (params?.exercise_modality) {
+      records = records.filter((m) => m.exercise_modality === params.exercise_modality);
     }
 
     if (params?.start_time) {

@@ -28,6 +28,8 @@ export interface ListAstronautsParams {
 
 export interface GetMeasurementsParams {
   measurement_type?: string;
+  context?: string;
+  exercise_modality?: string;
   start_time?: string;
   end_time?: string;
   limit?: number;

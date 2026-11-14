@@ -1,5 +1,5 @@
 import React from 'react';
-import { Rocket, ShieldCheck, Users, Activity, Clock } from 'lucide-react';
+import { Rocket, ShieldCheck, Users, Activity, TrendingUp, BookOpen, ArrowRight } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement } from '../../types/measurement';
 import { ConnectionState } from '../../types/api';
@@ -14,6 +14,8 @@ interface MissionOverviewProps {
   onExploreRoster: () => void;
   onViewTelemetry: () => void;
   onOpenAnatomy: () => void;
+  onOpenBaselines?: () => void;
+  onOpenCatalog?: () => void;
 }
 
 export const MissionOverview: React.FC<MissionOverviewProps> = ({
@@ -26,6 +28,8 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
   onExploreRoster,
   onViewTelemetry,
   onOpenAnatomy,
+  onOpenBaselines,
+  onOpenCatalog,
 }) => {
   const missions = Array.from(new Set(astronauts.map((a) => a.mission_name)));
   const loadedCount = measurements.length;
@@ -37,7 +41,10 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
       {/* Top Banner / Hero Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Monitored Crew */}
-        <div className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card">
+        <div
+          onClick={onExploreRoster}
+          className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card cursor-pointer hover:border-telemetry-cyan/60 transition-colors"
+        >
           <div className="flex items-center justify-between text-space-400">
             <span className="font-mono text-xs uppercase tracking-wider">Monitored Crew</span>
             <Users className="h-4 w-4 text-telemetry-cyan" />
@@ -63,43 +70,39 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
             <span className="font-mono text-3xl font-bold text-space-100">
               {totalMeasurements}
             </span>
-            <span className="text-xs text-space-400 font-mono">Records</span>
+            <span className="text-xs text-space-400 font-mono">Packets</span>
           </div>
           <p className="mt-1 text-[11px] text-space-400 font-mono">
-            {syntheticCount > 0
-              ? `${syntheticCount} synthetic / ${empiricalCount} empirical records`
-              : `${loadedCount} empirical records`}
+            {loadedCount} currently loaded into view
           </p>
         </div>
 
-        {/* Current Selected Day */}
+        {/* Provenance Ratio */}
         <div className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card">
           <div className="flex items-center justify-between text-space-400">
-            <span className="font-mono text-xs uppercase tracking-wider">Flight Elapsed Day</span>
-            <Clock className="h-4 w-4 text-telemetry-amber" />
+            <span className="font-mono text-xs uppercase tracking-wider">Data Provenance</span>
+            <ShieldCheck className="h-4 w-4 text-telemetry-amber" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-3xl font-bold text-space-100">
-              {selectedAstronaut ? `D+${selectedAstronaut.mission_day}` : '—'}
+            <span className="font-mono text-3xl font-bold text-telemetry-amber">
+              {syntheticCount}
             </span>
-            <span className="text-xs text-space-400 font-mono">
-              {selectedAstronaut?.mission_name || 'Select Crew'}
-            </span>
+            <span className="text-xs text-space-400 font-mono">Synthetic / {empiricalCount} Real</span>
           </div>
-          <p className="mt-1 text-[11px] text-space-400 font-mono truncate">
-            {selectedAstronaut?.name ? `${selectedAstronaut.name} (${selectedAstronaut.crew_role})` : 'No crew selected'}
+          <p className="mt-1 text-[11px] text-space-400 font-mono">
+            NASA Space Apps model telemetry
           </p>
         </div>
 
-        {/* Backend Connection & Integrity */}
+        {/* Spacecraft Link */}
         <div className="rounded-lg bg-space-850 p-4 border border-space-700/80 shadow-hud-card">
           <div className="flex items-center justify-between text-space-400">
-            <span className="font-mono text-xs uppercase tracking-wider">Service Tier</span>
-            <ShieldCheck className="h-4 w-4 text-telemetry-cyan" />
+            <span className="font-mono text-xs uppercase tracking-wider">Backend Service</span>
+            <Rocket className="h-4 w-4 text-telemetry-cyan" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span
-              className={`font-mono text-xl font-bold ${
+              className={`font-mono text-xl font-bold uppercase ${
                 connectionState === 'connected'
                   ? 'text-telemetry-emerald'
                   : connectionState === 'offline_demo'
@@ -107,52 +110,114 @@ export const MissionOverview: React.FC<MissionOverviewProps> = ({
                   : 'text-rose-400'
               }`}
             >
-              {connectionState === 'connected'
-                ? 'FASTAPI LIVE'
-                : connectionState === 'offline_demo'
-                ? 'OFFLINE DEMO'
-                : 'OFFLINE'}
+              {connectionState.replace('_', ' ')}
             </span>
           </div>
           <p className="mt-1 text-[11px] text-space-400 font-mono">
-            API v1.0 • SQLite Engine
+            FastAPI telemetry router active
           </p>
         </div>
       </div>
 
-      {/* Main Mission Control Overview Card */}
-      <div className="rounded-lg bg-gradient-to-r from-space-850 to-space-900 border border-space-700/80 p-5 shadow-hud-card">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Primary Astronaut Mission Context Card */}
+      <div className="rounded-lg bg-space-850 border border-space-700/80 p-5 shadow-hud-card font-mono">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-space-800">
           <div>
-            <div className="flex items-center gap-2">
-              <Rocket className="h-5 w-5 text-telemetry-cyan" />
-              <h2 className="text-base font-mono font-bold uppercase tracking-wide text-space-100">
-                COSMOLOOKUP Mission Observation Deck
-              </h2>
+            <span className="text-xs text-space-500 uppercase tracking-wider block">
+              Active Crew Specialist Focus
+            </span>
+            <h2 className="text-xl font-bold text-space-100 mt-0.5">
+              {selectedAstronaut?.name || 'No Astronaut Selected'}
+            </h2>
+            <div className="flex items-center gap-3 mt-1.5 text-xs text-space-400">
+              <span>Role: <strong className="text-space-200">{selectedAstronaut?.crew_role}</strong></span>
+              <span>•</span>
+              <span>Mission: <strong className="text-telemetry-cyan">{selectedAstronaut?.mission_name}</strong></span>
+              <span>•</span>
+              <span>Flight Day: <strong className="text-space-200">Day {selectedAstronaut?.mission_day}</strong></span>
             </div>
-            <p className="mt-1 text-xs text-space-300 max-w-2xl leading-relaxed">
-              Telemetry records retrieved from backend service via REST API v1.0. Flight surgeons and researchers can inspect time-series biometric observations, verify telemetry provenance flags (<code className="text-telemetry-cyan">is_synthetic</code>), and analyze crew health parameters.
-            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={onExploreRoster}
-              className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs font-mono text-space-100 transition-colors"
-            >
-              Inspect Crew Roster
-            </button>
+
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={onViewTelemetry}
-              className="px-3.5 py-2 rounded bg-telemetry-cyan/20 hover:bg-telemetry-cyan/30 border border-telemetry-cyan/50 text-xs font-mono text-telemetry-cyan font-semibold transition-colors"
+              className="px-3.5 py-2 rounded bg-telemetry-cyan hover:bg-telemetry-cyan/90 text-xs font-bold text-space-950 transition-colors"
             >
-              Open Telemetry Teleplot
+              Telemetry Stream
             </button>
+            {onOpenBaselines && (
+              <button
+                onClick={onOpenBaselines}
+                className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-telemetry-cyan/50 text-xs text-telemetry-cyan transition-colors"
+              >
+                Personal Baselines
+              </button>
+            )}
             <button
               onClick={onOpenAnatomy}
-              className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs font-mono text-space-200 transition-colors"
+              className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs text-space-200 transition-colors"
             >
-              3D Anatomy Wireframe
+              3D Anatomy Map
             </button>
+            {onOpenCatalog && (
+              <button
+                onClick={onOpenCatalog}
+                className="px-3.5 py-2 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs text-space-300 transition-colors"
+              >
+                Catalog Dictionary
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Operational Modules Banner */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 text-xs">
+          <div
+            onClick={onViewTelemetry}
+            className="p-3 rounded bg-space-900 border border-space-800 hover:border-space-700 cursor-pointer transition-all space-y-1"
+          >
+            <div className="flex items-center justify-between text-space-200 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <Activity className="h-3.5 w-3.5 text-telemetry-cyan" />
+                Telemetry Explorer
+              </span>
+              <ArrowRight className="h-3 w-3 text-space-500" />
+            </div>
+            <p className="text-[11px] text-space-400">
+              Filter by operational context, countermeasure modality, and time window.
+            </p>
+          </div>
+
+          <div
+            onClick={onOpenBaselines}
+            className="p-3 rounded bg-space-900 border border-space-800 hover:border-space-700 cursor-pointer transition-all space-y-1"
+          >
+            <div className="flex items-center justify-between text-space-200 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5 text-telemetry-emerald" />
+                Personal Baselines
+              </span>
+              <ArrowRight className="h-3 w-3 text-space-500" />
+            </div>
+            <p className="text-[11px] text-space-400">
+              Inspect statistical operational reference envelopes (Median, IQR) and explainable comparisons.
+            </p>
+          </div>
+
+          <div
+            onClick={onOpenCatalog}
+            className="p-3 rounded bg-space-900 border border-space-800 hover:border-space-700 cursor-pointer transition-all space-y-1"
+          >
+            <div className="flex items-center justify-between text-space-200 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="h-3.5 w-3.5 text-purple-400" />
+                Measurement Catalog
+              </span>
+              <ArrowRight className="h-3 w-3 text-space-500" />
+            </div>
+            <p className="text-[11px] text-space-400">
+              Canonical definitions, physical range guards, accepted wire aliases, and context taxonomy.
+            </p>
           </div>
         </div>
       </div>

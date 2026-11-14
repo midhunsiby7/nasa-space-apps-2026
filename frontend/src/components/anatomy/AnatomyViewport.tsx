@@ -29,6 +29,7 @@ interface AnatomyViewportProps {
   selectedMetric?: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   onSwitchToChart: () => void;
+  onNavigateToBaselines?: (metric: MeasurementType) => void;
 }
 
 export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
@@ -37,6 +38,7 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
   selectedMetric,
   onSelectMetric,
   onSwitchToChart,
+  onNavigateToBaselines,
 }) => {
   const [selectedRegion, setSelectedRegion] = useState<AnatomicalRegionId>('cardiovascular');
   const [hoveredRegion, setHoveredRegion] = useState<AnatomicalRegionId | null>(null);
@@ -271,8 +273,10 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
           <RegionTelemetryInspector
             regionId={selectedRegion}
             measurements={measurements}
+            astronautId={astronaut?.id}
             onSelectMetric={onSelectMetric}
             onNavigateToChart={handleNavigateToChart}
+            onNavigateToBaselines={onNavigateToBaselines}
           />
         </div>
       </div>
