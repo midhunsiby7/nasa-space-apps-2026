@@ -10,13 +10,29 @@ export class ApiError extends Error {
   public code: string;
   public details?: unknown;
   public statusCode: number;
+  public status: number;
 
-  constructor(message: string, code: string, statusCode: number, details?: unknown) {
-    super(message);
+  constructor(
+    statusOrMessage: number | string,
+    messageOrCode?: string,
+    codeOrStatus?: string | number,
+    details?: unknown
+  ) {
+    if (typeof statusOrMessage === 'number') {
+      super(messageOrCode || 'API Error');
+      this.status = statusOrMessage;
+      this.statusCode = statusOrMessage;
+      this.code = typeof codeOrStatus === 'string' ? codeOrStatus : 'API_ERROR';
+      this.details = details;
+    } else {
+      super(statusOrMessage);
+      this.code = messageOrCode || 'API_ERROR';
+      const codeNum = typeof codeOrStatus === 'number' ? codeOrStatus : 500;
+      this.status = codeNum;
+      this.statusCode = codeNum;
+      this.details = details;
+    }
     this.name = 'ApiError';
-    this.code = code;
-    this.statusCode = statusCode;
-    this.details = details;
   }
 }
 
@@ -28,6 +44,8 @@ export interface ListAstronautsParams {
 
 export interface GetMeasurementsParams {
   measurement_type?: string;
+  context?: string;
+  exercise_modality?: string;
   start_time?: string;
   end_time?: string;
   limit?: number;

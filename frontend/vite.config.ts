@@ -20,7 +20,6 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           charts: ['recharts'],
-          three: ['three', '@react-three/fiber', '@react-three/drei'],
           icons: ['lucide-react'],
         },
       },

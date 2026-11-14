@@ -13,6 +13,32 @@ from app.schemas.measurement import (
     MeasurementResponse,
     MeasurementListResponse,
 )
+from app.schemas.baseline import (
+    PersonalOperationalEnvelope,
+    BaselineQualitySummary,
+    BaselineResponse,
+    BaselineListResponse,
+    BaselineCalculationRequest,
+    PreflightFinalizationRequest,
+)
+from app.schemas.trend import (
+    TrendObservation,
+    AstronautTrendsResponse,
+    MetricFreshnessItem,
+    TelemetryFreshnessResponse,
+)
+from app.schemas.assessment import (
+    AssessmentFinding,
+    GuidanceItem,
+    AssessmentResponse,
+    AssessmentListResponse,
+    AssessmentGenerationRequest,
+)
+from app.schemas.alert import (
+    AlertResponse,
+    AlertListResponse,
+    AlertActionRequest,
+)
 
 __all__ = [
     "ErrorDetail",
@@ -25,4 +51,22 @@ __all__ = [
     "MeasurementCreate",
     "MeasurementResponse",
     "MeasurementListResponse",
+    "PersonalOperationalEnvelope",
+    "BaselineQualitySummary",
+    "BaselineResponse",
+    "BaselineListResponse",
+    "BaselineCalculationRequest",
+    "PreflightFinalizationRequest",
+    "TrendObservation",
+    "AstronautTrendsResponse",
+    "MetricFreshnessItem",
+    "TelemetryFreshnessResponse",
+    "AssessmentFinding",
+    "GuidanceItem",
+    "AssessmentResponse",
+    "AssessmentListResponse",
+    "AssessmentGenerationRequest",
+    "AlertResponse",
+    "AlertListResponse",
+    "AlertActionRequest",
 ]

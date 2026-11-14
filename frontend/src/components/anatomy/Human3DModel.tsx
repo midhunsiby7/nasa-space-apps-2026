@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AnatomicalRegionId, ANATOMICAL_REGIONS } from './anatomyRegistry';
@@ -19,52 +19,54 @@ export const Human3DModel: React.FC<Human3DModelProps> = ({
   isWireframe = false,
 }) => {
   const heartRef = useRef<THREE.Mesh>(null);
-  const lungsLeftRef = useRef<THREE.Mesh>(null);
-  const lungsRightRef = useRef<THREE.Mesh>(null);
-  const sensorCapsuleRef = useRef<THREE.Mesh>(null);
-  const ringMarkerRef = useRef<THREE.Group>(null);
+  const leftLungRef = useRef<THREE.Mesh>(null);
+  const rightLungRef = useRef<THREE.Mesh>(null);
+  const sensorCapsuleRef = useRef<THREE.Group>(null);
+  const brainRef = useRef<THREE.Mesh>(null);
+  const leftEyeRef = useRef<THREE.Mesh>(null);
+  const rightEyeRef = useRef<THREE.Mesh>(null);
 
-  // Subtle physiological animations (cardiac cycle & respiratory cadence)
+  // Subtle physiological animations (rhythmic cardiac pulse, pulmonary ventilation)
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
 
-    // Heartbeat pulse (~72 bpm = 1.2 Hz)
+    // Heartbeat pulse (~72 bpm / 1.2 Hz)
     if (heartRef.current) {
-      const pulse = 1 + Math.sin(t * 7.5) * 0.045;
+      const pulse = 1 + Math.sin(t * 7.5) * 0.05;
       heartRef.current.scale.set(pulse, pulse, pulse);
     }
 
-    // Pulmonary respiratory expansion (~14 breaths/min = 0.23 Hz)
-    if (lungsLeftRef.current && lungsRightRef.current) {
-      const resp = 1 + Math.sin(t * 1.5) * 0.035;
-      lungsLeftRef.current.scale.set(resp, resp, resp);
-      lungsRightRef.current.scale.set(resp, resp, resp);
+    // Pulmonary respiration expansion (~14 breaths/min)
+    if (leftLungRef.current && rightLungRef.current) {
+      const resp = 1 + Math.sin(t * 1.5) * 0.04;
+      leftLungRef.current.scale.set(resp, resp, resp);
+      rightLungRef.current.scale.set(resp, resp, resp);
     }
 
-    // Thermal sensor orbit pulse
+    // Ingestible capsule visceral orbit in abdomen
     if (sensorCapsuleRef.current) {
       sensorCapsuleRef.current.rotation.y = t * 1.2;
     }
 
-    // Target highlight ring rotation
-    if (ringMarkerRef.current) {
-      ringMarkerRef.current.rotation.z = t * 0.8;
+    // Ocular micro-saccade simulation
+    if (leftEyeRef.current && rightEyeRef.current) {
+      const saccade = Math.sin(t * 2.5) * 0.01;
+      leftEyeRef.current.rotation.x = saccade;
+      rightEyeRef.current.rotation.x = saccade;
     }
   });
 
-  // Reusable materials helper based on selection and hover
-  const getRegionMaterial = (regionId: AnatomicalRegionId, baseColor: string) => {
+  const getMaterialProps = (regionId: AnatomicalRegionId, defaultColor: string) => {
     const isSelected = selectedRegion === regionId;
     const isHovered = hoveredRegion === regionId;
-    const regionDef = ANATOMICAL_REGIONS[regionId];
-    const accentColor = regionDef.color;
+    const accentColor = ANATOMICAL_REGIONS[regionId].color;
 
     if (isSelected) {
       return {
         color: new THREE.Color(accentColor),
-        emissive: new THREE.Color(accentColor).multiplyScalar(0.4),
-        roughness: 0.2,
-        metalness: 0.4,
+        emissive: new THREE.Color(accentColor).multiplyScalar(0.55),
+        roughness: 0.15,
+        metalness: 0.35,
         transparent: true,
         opacity: 0.95,
         wireframe: isWireframe,
@@ -73,10 +75,10 @@ export const Human3DModel: React.FC<Human3DModelProps> = ({
 
     if (isHovered) {
       return {
-        color: new THREE.Color(accentColor).lerp(new THREE.Color('#ffffff'), 0.2),
-        emissive: new THREE.Color(accentColor).multiplyScalar(0.25),
+        color: new THREE.Color(accentColor).multiplyScalar(0.9),
+        emissive: new THREE.Color(accentColor).multiplyScalar(0.3),
         roughness: 0.3,
-        metalness: 0.3,
+        metalness: 0.2,
         transparent: true,
         opacity: 0.85,
         wireframe: isWireframe,
@@ -84,347 +86,298 @@ export const Human3DModel: React.FC<Human3DModelProps> = ({
     }
 
     return {
-      color: new THREE.Color(baseColor),
-      emissive: new THREE.Color('#070a0f'),
-      roughness: 0.6,
+      color: new THREE.Color(defaultColor),
+      emissive: new THREE.Color('#0a1120'),
+      roughness: 0.5,
       metalness: 0.2,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.55,
       wireframe: isWireframe,
     };
   };
 
-  // Materials configuration
-  const matHead = useMemo(() => getRegionMaterial('cranial', '#1e2c45'), [selectedRegion, hoveredRegion, isWireframe]);
-  const matCardio = useMemo(() => getRegionMaterial('cardiovascular', '#273856'), [selectedRegion, hoveredRegion, isWireframe]);
-  const matResp = useMemo(() => getRegionMaterial('respiratory', '#273856'), [selectedRegion, hoveredRegion, isWireframe]);
-  const matCore = useMemo(() => getRegionMaterial('thermoregulation', '#1e2c45'), [selectedRegion, hoveredRegion, isWireframe]);
-  const matSkel = useMemo(() => getRegionMaterial('musculoskeletal', '#162032'), [selectedRegion, hoveredRegion, isWireframe]);
-  const matLimbs = useMemo(() => getRegionMaterial('lower_limbs', '#162032'), [selectedRegion, hoveredRegion, isWireframe]);
+  const handlePointerDown = (e: any, regionId: AnatomicalRegionId) => {
+    e.stopPropagation();
+    onSelectRegion(regionId);
+  };
 
-  // Active target coordinates for highlight ring marker
-  const targetPos = ANATOMICAL_REGIONS[selectedRegion].cameraTarget;
+  const handlePointerOver = (e: any, regionId: AnatomicalRegionId) => {
+    e.stopPropagation();
+    onHoverRegion(regionId);
+  };
+
+  const handlePointerOut = (e: any) => {
+    e.stopPropagation();
+    onHoverRegion(null);
+  };
 
   return (
-    <group position={[0, -0.2, 0]} dispose={null}>
-      {/* ==================== 1. HEAD / CRANIAL ==================== */}
+    <group position={[0, -0.2, 0]}>
+      {/* =========================================================================
+       * 1. CRANIAL & NEUROLOGICAL SYSTEM (Head, Brain, Cervical Spine)
+       * ========================================================================= */}
       <group
-        position={[0, 1.35, 0]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectRegion('cranial');
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHoverRegion('cranial');
-        }}
-        onPointerOut={() => onHoverRegion(null)}
+        onClick={(e) => handlePointerDown(e, 'neurological')}
+        onPointerOver={(e) => handlePointerOver(e, 'neurological')}
+        onPointerOut={handlePointerOut}
       >
-        {/* Neurocranium / Calvaria */}
-        <mesh position={[0, 0, 0]}>
-          <sphereGeometry args={[0.22, 28, 28]} />
-          <meshStandardMaterial {...matHead} />
-        </mesh>
-        {/* Viscerocranium / Facial Skeleton */}
-        <mesh position={[0, -0.06, 0.08]} scale={[0.85, 1, 0.9]}>
-          <boxGeometry args={[0.22, 0.22, 0.16]} />
-          <meshStandardMaterial {...matHead} />
-        </mesh>
-        {/* Cervical Spine Column */}
-        <mesh position={[0, -0.24, -0.02]}>
-          <cylinderGeometry args={[0.07, 0.08, 0.18, 16]} />
-          <meshStandardMaterial {...matSkel} />
-        </mesh>
-      </group>
-
-      {/* ==================== 2. THORAX & SKELETON ==================== */}
-      <group position={[0, 0.7, 0]}>
-        {/* Shoulder Girdle / Clavicles */}
-        <mesh
-          position={[0, 0.22, 0]}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectRegion('musculoskeletal');
-          }}
-          onPointerOver={(e) => {
-            e.stopPropagation();
-            onHoverRegion('musculoskeletal');
-          }}
-          onPointerOut={() => onHoverRegion(null)}
-        >
-          <boxGeometry args={[0.88, 0.08, 0.18]} />
-          <meshStandardMaterial {...matSkel} />
+        {/* Cranium Shell */}
+        <mesh position={[0, 1.45, 0]}>
+          <sphereGeometry args={[0.26, 28, 28]} />
+          <meshStandardMaterial {...getMaterialProps('neurological', '#1e293b')} />
         </mesh>
 
-        {/* Ribcage Architectural Lattice */}
-        <mesh
-          position={[0, -0.05, 0]}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectRegion('cardiovascular');
-          }}
-          onPointerOver={(e) => {
-            e.stopPropagation();
-            onHoverRegion('cardiovascular');
-          }}
-          onPointerOut={() => onHoverRegion(null)}
-        >
-          <cylinderGeometry args={[0.34, 0.28, 0.52, 24, 1, true]} />
-          <meshStandardMaterial {...matCardio} />
-        </mesh>
-
-        {/* Sternum (Anterior Midline) */}
-        <mesh position={[0, -0.04, 0.28]}>
-          <boxGeometry args={[0.06, 0.38, 0.03]} />
-          <meshStandardMaterial {...matSkel} />
-        </mesh>
-
-        {/* Thoracic Spine (Posterior Column) */}
-        <mesh position={[0, -0.05, -0.25]}>
-          <boxGeometry args={[0.07, 0.52, 0.08]} />
-          <meshStandardMaterial {...matSkel} />
-        </mesh>
-      </group>
-
-      {/* ==================== 3. INTERNAL CARDIOPULMONARY ORGANS ==================== */}
-      {/* Heart Mediastinum Node */}
-      <group
-        position={[-0.04, 0.68, 0.06]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectRegion('cardiovascular');
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHoverRegion('cardiovascular');
-        }}
-        onPointerOut={() => onHoverRegion(null)}
-      >
-        <mesh ref={heartRef}>
-          <sphereGeometry args={[0.11, 24, 24]} />
+        {/* Inner Brain Mass */}
+        <mesh ref={brainRef} position={[0, 1.47, 0.02]}>
+          <sphereGeometry args={[0.18, 20, 20]} />
           <meshStandardMaterial
-            color="#f43f5e"
-            emissive="#f43f5e"
-            emissiveIntensity={selectedRegion === 'cardiovascular' ? 0.6 : 0.25}
-            roughness={0.2}
-            metalness={0.5}
+            color={selectedRegion === 'neurological' ? '#06b6d4' : '#2dd4bf'}
+            emissive={selectedRegion === 'neurological' ? '#06b6d4' : '#042f2e'}
+            roughness={0.3}
+            transparent
+            opacity={0.8}
+            wireframe={isWireframe}
           />
         </mesh>
-        {/* Aortic Arch Root */}
-        <mesh position={[0.02, 0.12, -0.02]}>
-          <cylinderGeometry args={[0.03, 0.035, 0.09, 12]} />
-          <meshStandardMaterial color="#f43f5e" emissive="#9f1239" emissiveIntensity={0.2} />
+
+        {/* Neck / Cervical Segment */}
+        <mesh position={[0, 1.15, 0]}>
+          <cylinderGeometry args={[0.09, 0.11, 0.18, 16]} />
+          <meshStandardMaterial {...getMaterialProps('neurological', '#1e293b')} />
         </mesh>
       </group>
 
-      {/* Pulmonary Lobes (Lungs) */}
+      {/* =========================================================================
+       * 2. OCULAR SYSTEM (Eyes & Optic Pathway - SANS Domain)
+       * ========================================================================= */}
       <group
-        position={[0, 0.68, 0.02]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectRegion('respiratory');
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHoverRegion('respiratory');
-        }}
-        onPointerOut={() => onHoverRegion(null)}
+        onClick={(e) => handlePointerDown(e, 'ocular')}
+        onPointerOver={(e) => handlePointerOver(e, 'ocular')}
+        onPointerOut={handlePointerOut}
       >
-        {/* Right Lung */}
-        <mesh ref={lungsRightRef} position={[0.16, 0, 0]} scale={[0.12, 0.24, 0.12]}>
-          <sphereGeometry args={[1, 16, 16]} />
-          <meshStandardMaterial {...matResp} />
-        </mesh>
-        {/* Left Lung */}
-        <mesh ref={lungsLeftRef} position={[-0.17, 0, 0]} scale={[0.11, 0.23, 0.11]}>
-          <sphereGeometry args={[1, 16, 16]} />
-          <meshStandardMaterial {...matResp} />
-        </mesh>
-      </group>
-
-      {/* ==================== 4. ABDOMEN & THERMOREGULATION ==================== */}
-      <group
-        position={[0, 0.24, 0]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectRegion('thermoregulation');
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHoverRegion('thermoregulation');
-        }}
-        onPointerOut={() => onHoverRegion(null)}
-      >
-        {/* Abdominal Visceral Volume */}
-        <mesh position={[0, -0.05, 0]}>
-          <cylinderGeometry args={[0.27, 0.25, 0.38, 20]} />
-          <meshStandardMaterial {...matCore} />
-        </mesh>
-
-        {/* Ingestible Thermal Sensor Pill Hotspot */}
-        <mesh ref={sensorCapsuleRef} position={[0.03, -0.04, 0.08]}>
-          <capsuleGeometry args={[0.03, 0.06, 8, 16]} />
+        {/* Left Eye Orbit & Globe */}
+        <mesh ref={leftEyeRef} position={[-0.09, 1.46, 0.23]}>
+          <sphereGeometry args={[0.045, 16, 16]} />
           <meshStandardMaterial
-            color="#f59e0b"
-            emissive="#f59e0b"
-            emissiveIntensity={selectedRegion === 'thermoregulation' ? 0.8 : 0.35}
+            color={selectedRegion === 'ocular' ? '#38bdf8' : '#7dd3fc'}
+            emissive={selectedRegion === 'ocular' ? '#0284c7' : '#0369a1'}
             roughness={0.1}
-            metalness={0.7}
-          />
-        </mesh>
-      </group>
-
-      {/* ==================== 5. PELVIS & MUSCULOSKELETAL FRAME ==================== */}
-      <group
-        position={[0, -0.04, 0]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectRegion('musculoskeletal');
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHoverRegion('musculoskeletal');
-        }}
-        onPointerOut={() => onHoverRegion(null)}
-      >
-        <mesh position={[0, 0, 0]}>
-          <cylinderGeometry args={[0.26, 0.22, 0.24, 16]} />
-          <meshStandardMaterial {...matSkel} />
-        </mesh>
-      </group>
-
-      {/* ==================== 6. UPPER EXTREMITIES ==================== */}
-      <group
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectRegion('musculoskeletal');
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHoverRegion('musculoskeletal');
-        }}
-        onPointerOut={() => onHoverRegion(null)}
-      >
-        {/* Right Arm */}
-        <group position={[0.48, 0.7, 0]}>
-          {/* Shoulder joint */}
-          <mesh position={[0, 0, 0]}>
-            <sphereGeometry args={[0.08, 16, 16]} />
-            <meshStandardMaterial {...matSkel} />
-          </mesh>
-          {/* Brachium (upper arm) */}
-          <mesh position={[0.05, -0.24, 0]}>
-            <cylinderGeometry args={[0.06, 0.05, 0.38, 14]} />
-            <meshStandardMaterial {...matSkel} />
-          </mesh>
-          {/* Antebrachium (forearm) */}
-          <mesh position={[0.08, -0.62, 0]}>
-            <cylinderGeometry args={[0.048, 0.04, 0.36, 14]} />
-            <meshStandardMaterial {...matSkel} />
-          </mesh>
-        </group>
-
-        {/* Left Arm */}
-        <group position={[-0.48, 0.7, 0]}>
-          {/* Shoulder joint */}
-          <mesh position={[0, 0, 0]}>
-            <sphereGeometry args={[0.08, 16, 16]} />
-            <meshStandardMaterial {...matSkel} />
-          </mesh>
-          {/* Brachium */}
-          <mesh position={[-0.05, -0.24, 0]}>
-            <cylinderGeometry args={[0.06, 0.05, 0.38, 14]} />
-            <meshStandardMaterial {...matSkel} />
-          </mesh>
-          {/* Antebrachium */}
-          <mesh position={[-0.08, -0.62, 0]}>
-            <cylinderGeometry args={[0.048, 0.04, 0.36, 14]} />
-            <meshStandardMaterial {...matSkel} />
-          </mesh>
-        </group>
-      </group>
-
-      {/* ==================== 7. LOWER EXTREMITIES ==================== */}
-      <group
-        position={[0, -0.2, 0]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectRegion('lower_limbs');
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          onHoverRegion('lower_limbs');
-        }}
-        onPointerOut={() => onHoverRegion(null)}
-      >
-        {/* Right Leg */}
-        <group position={[0.15, 0, 0]}>
-          {/* Thigh (Femur segment) */}
-          <mesh position={[0, -0.32, 0]}>
-            <cylinderGeometry args={[0.1, 0.075, 0.52, 16]} />
-            <meshStandardMaterial {...matLimbs} />
-          </mesh>
-          {/* Knee joint (Patella) */}
-          <mesh position={[0, -0.6, 0.03]}>
-            <sphereGeometry args={[0.065, 14, 14]} />
-            <meshStandardMaterial {...matLimbs} />
-          </mesh>
-          {/* Lower leg (Tibia/Fibula segment) */}
-          <mesh position={[0, -0.92, 0]}>
-            <cylinderGeometry args={[0.07, 0.055, 0.52, 16]} />
-            <meshStandardMaterial {...matLimbs} />
-          </mesh>
-          {/* Foot */}
-          <mesh position={[0, -1.2, 0.08]}>
-            <boxGeometry args={[0.09, 0.06, 0.22]} />
-            <meshStandardMaterial {...matLimbs} />
-          </mesh>
-        </group>
-
-        {/* Left Leg */}
-        <group position={[-0.15, 0, 0]}>
-          {/* Thigh */}
-          <mesh position={[0, -0.32, 0]}>
-            <cylinderGeometry args={[0.1, 0.075, 0.52, 16]} />
-            <meshStandardMaterial {...matLimbs} />
-          </mesh>
-          {/* Knee joint */}
-          <mesh position={[0, -0.6, 0.03]}>
-            <sphereGeometry args={[0.065, 14, 14]} />
-            <meshStandardMaterial {...matLimbs} />
-          </mesh>
-          {/* Lower leg */}
-          <mesh position={[0, -0.92, 0]}>
-            <cylinderGeometry args={[0.07, 0.055, 0.52, 16]} />
-            <meshStandardMaterial {...matLimbs} />
-          </mesh>
-          {/* Foot */}
-          <mesh position={[0, -1.2, 0.08]}>
-            <boxGeometry args={[0.09, 0.06, 0.22]} />
-            <meshStandardMaterial {...matLimbs} />
-          </mesh>
-        </group>
-      </group>
-
-      {/* ==================== 8. HUD SELECTION TARGET RING ==================== */}
-      <group ref={ringMarkerRef} position={targetPos}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.34, 0.36, 32]} />
-          <meshBasicMaterial
-            color={ANATOMICAL_REGIONS[selectedRegion].color}
+            metalness={0.3}
             transparent
-            opacity={0.7}
-            side={THREE.DoubleSide}
+            opacity={0.95}
           />
         </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.38, 0.39, 32]} />
-          <meshBasicMaterial
-            color={ANATOMICAL_REGIONS[selectedRegion].color}
+
+        {/* Right Eye Orbit & Globe */}
+        <mesh ref={rightEyeRef} position={[0.09, 1.46, 0.23]}>
+          <sphereGeometry args={[0.045, 16, 16]} />
+          <meshStandardMaterial
+            color={selectedRegion === 'ocular' ? '#38bdf8' : '#7dd3fc'}
+            emissive={selectedRegion === 'ocular' ? '#0284c7' : '#0369a1'}
+            roughness={0.1}
+            metalness={0.3}
             transparent
-            opacity={0.3}
-            side={THREE.DoubleSide}
+            opacity={0.95}
           />
+        </mesh>
+
+        {/* Optic Chiasm Conduit */}
+        <mesh position={[0, 1.43, 0.15]}>
+          <cylinderGeometry args={[0.015, 0.015, 0.12, 8]} />
+          <meshStandardMaterial {...getMaterialProps('ocular', '#38bdf8')} />
+        </mesh>
+      </group>
+
+      {/* =========================================================================
+       * 3. CARDIOVASCULAR SYSTEM (Heart, Aorta, Thoracic Circulation)
+       * ========================================================================= */}
+      <group
+        onClick={(e) => handlePointerDown(e, 'cardiovascular')}
+        onPointerOver={(e) => handlePointerOver(e, 'cardiovascular')}
+        onPointerOut={handlePointerOut}
+      >
+        {/* Heart Muscle (Left-leaning mediastinum) */}
+        <mesh ref={heartRef} position={[0.06, 0.60, 0.09]}>
+          <sphereGeometry args={[0.095, 20, 20]} />
+          <meshStandardMaterial
+            color={selectedRegion === 'cardiovascular' ? '#f43f5e' : '#e11d48'}
+            emissive={selectedRegion === 'cardiovascular' ? '#be123c' : '#881337'}
+            roughness={0.2}
+            metalness={0.4}
+            transparent
+            opacity={0.95}
+            wireframe={isWireframe}
+          />
+        </mesh>
+
+        {/* Aortic Arch & Ascending Root */}
+        <mesh position={[0.03, 0.74, 0.08]} rotation={[0, 0, Math.PI / 4]}>
+          <torusGeometry args={[0.05, 0.02, 10, 18, Math.PI * 0.9]} />
+          <meshStandardMaterial {...getMaterialProps('cardiovascular', '#f43f5e')} />
+        </mesh>
+
+        {/* Thoracic Cavity Envelope Outline */}
+        <mesh position={[0, 0.65, 0]}>
+          <cylinderGeometry args={[0.26, 0.23, 0.45, 20]} />
+          <meshStandardMaterial {...getMaterialProps('cardiovascular', '#1e293b')} />
+        </mesh>
+      </group>
+
+      {/* =========================================================================
+       * 4. PULMONARY / RESPIRATORY SYSTEM (Lungs & Trachea)
+       * ========================================================================= */}
+      <group
+        onClick={(e) => handlePointerDown(e, 'respiratory')}
+        onPointerOver={(e) => handlePointerOver(e, 'respiratory')}
+        onPointerOut={handlePointerOut}
+      >
+        {/* Left Pulmonary Lobe */}
+        <mesh ref={leftLungRef} position={[-0.14, 0.64, 0.04]}>
+          <capsuleGeometry args={[0.085, 0.28, 12, 16]} />
+          <meshStandardMaterial
+            color={selectedRegion === 'respiratory' ? '#10b981' : '#059669'}
+            emissive={selectedRegion === 'respiratory' ? '#047857' : '#064e3b'}
+            roughness={0.3}
+            transparent
+            opacity={0.8}
+            wireframe={isWireframe}
+          />
+        </mesh>
+
+        {/* Right Pulmonary Lobe */}
+        <mesh ref={rightLungRef} position={[0.16, 0.64, 0.04]}>
+          <capsuleGeometry args={[0.085, 0.28, 12, 16]} />
+          <meshStandardMaterial
+            color={selectedRegion === 'respiratory' ? '#10b981' : '#059669'}
+            emissive={selectedRegion === 'respiratory' ? '#047857' : '#064e3b'}
+            roughness={0.3}
+            transparent
+            opacity={0.8}
+            wireframe={isWireframe}
+          />
+        </mesh>
+
+        {/* Trachea */}
+        <mesh position={[0, 0.92, 0.06]}>
+          <cylinderGeometry args={[0.025, 0.025, 0.22, 12]} />
+          <meshStandardMaterial {...getMaterialProps('respiratory', '#10b981')} />
+        </mesh>
+      </group>
+
+      {/* =========================================================================
+       * 5. CORE THERMOREGULATION (Abdomen & Ingestible Telemetry Sensor Capsule)
+       * ========================================================================= */}
+      <group
+        onClick={(e) => handlePointerDown(e, 'thermoregulation')}
+        onPointerOver={(e) => handlePointerOver(e, 'thermoregulation')}
+        onPointerOut={handlePointerOut}
+      >
+        {/* Abdominal Visceral Shell */}
+        <mesh position={[0, 0.16, 0]}>
+          <cylinderGeometry args={[0.22, 0.20, 0.42, 20]} />
+          <meshStandardMaterial {...getMaterialProps('thermoregulation', '#1e293b')} />
+        </mesh>
+
+        {/* Visceral Core Center */}
+        <mesh position={[0, 0.16, 0.03]}>
+          <sphereGeometry args={[0.13, 16, 16]} />
+          <meshStandardMaterial
+            color={selectedRegion === 'thermoregulation' ? '#f59e0b' : '#d97706'}
+            emissive={selectedRegion === 'thermoregulation' ? '#b45309' : '#78350f'}
+            roughness={0.3}
+            transparent
+            opacity={0.85}
+            wireframe={isWireframe}
+          />
+        </mesh>
+
+        {/* Orbiting Ingestible Telemetry Capsule Pill */}
+        <group ref={sensorCapsuleRef} position={[0, 0.16, 0]}>
+          <mesh position={[0.18, 0, 0]}>
+            <capsuleGeometry args={[0.02, 0.045, 8, 12]} />
+            <meshStandardMaterial
+              color="#fbbf24"
+              emissive="#f59e0b"
+              roughness={0.1}
+              metalness={0.8}
+            />
+          </mesh>
+        </group>
+      </group>
+
+      {/* =========================================================================
+       * 6. MUSCULOSKELETAL FRAMEWORK (Spine, Ribs, Pelvis, Limbs)
+       * ========================================================================= */}
+      <group
+        onClick={(e) => handlePointerDown(e, 'musculoskeletal')}
+        onPointerOver={(e) => handlePointerOver(e, 'musculoskeletal')}
+        onPointerOut={handlePointerOut}
+      >
+        {/* Vertebral Column (Spine from Cervical to Lumbar) */}
+        <mesh position={[0, 0.48, -0.11]}>
+          <cylinderGeometry args={[0.032, 0.042, 0.95, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#475569')} />
+        </mesh>
+
+        {/* Clavicles */}
+        <mesh position={[-0.18, 0.92, 0.02]} rotation={[0, 0, 0.1]}>
+          <cylinderGeometry args={[0.018, 0.018, 0.24, 8]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#475569')} />
+        </mesh>
+        <mesh position={[0.18, 0.92, 0.02]} rotation={[0, 0, -0.1]}>
+          <cylinderGeometry args={[0.018, 0.018, 0.24, 8]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#475569')} />
+        </mesh>
+
+        {/* Pelvic Girdle */}
+        <mesh position={[0, -0.14, 0]}>
+          <cylinderGeometry args={[0.21, 0.16, 0.20, 16]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
+        </mesh>
+
+        {/* Upper Limbs: Left Arm */}
+        <mesh position={[-0.38, 0.58, 0]} rotation={[0, 0, 0.15]}>
+          <capsuleGeometry args={[0.055, 0.45, 8, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
+        </mesh>
+        <mesh position={[-0.45, 0.16, 0]} rotation={[0, 0, 0.08]}>
+          <capsuleGeometry args={[0.045, 0.42, 8, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
+        </mesh>
+
+        {/* Upper Limbs: Right Arm & Pulse Oximeter Sensor Wristband */}
+        <mesh position={[0.38, 0.58, 0]} rotation={[0, 0, -0.15]}>
+          <capsuleGeometry args={[0.055, 0.45, 8, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
+        </mesh>
+        <mesh position={[0.45, 0.16, 0]} rotation={[0, 0, -0.08]}>
+          <capsuleGeometry args={[0.045, 0.42, 8, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
+        </mesh>
+        {/* Optical Sensor Wristband on Right Arm */}
+        <mesh position={[0.48, -0.04, 0]}>
+          <torusGeometry args={[0.052, 0.015, 8, 16]} />
+          <meshStandardMaterial color="#06b6d4" emissive="#0891b2" />
+        </mesh>
+
+        {/* Lower Limbs: Left Thigh (Femur) & Calf */}
+        <mesh position={[-0.12, -0.48, 0]}>
+          <capsuleGeometry args={[0.075, 0.50, 8, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
+        </mesh>
+        <mesh position={[-0.12, -1.02, 0]}>
+          <capsuleGeometry args={[0.065, 0.52, 8, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
+        </mesh>
+
+        {/* Lower Limbs: Right Thigh (Femur) & Calf */}
+        <mesh position={[0.12, -0.48, 0]}>
+          <capsuleGeometry args={[0.075, 0.50, 8, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
+        </mesh>
+        <mesh position={[0.12, -1.02, 0]}>
+          <capsuleGeometry args={[0.065, 0.52, 8, 12]} />
+          <meshStandardMaterial {...getMaterialProps('musculoskeletal', '#334155')} />
         </mesh>
       </group>
     </group>

@@ -8,6 +8,9 @@ from app.database.base import Base
 
 if TYPE_CHECKING:
     from app.models.measurement import Measurement
+    from app.models.baseline import AstronautBaseline
+    from app.models.assessment import HealthAssessment
+    from app.models.alert import HealthAlert
 
 
 class Astronaut(Base):
@@ -33,6 +36,30 @@ class Astronaut(Base):
     # 1:N Relationship to measurements with cascade delete
     measurements: Mapped[List["Measurement"]] = relationship(
         "Measurement",
+        back_populates="astronaut",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # 1:N Relationship to calculated baselines with cascade delete
+    baselines: Mapped[List["AstronautBaseline"]] = relationship(
+        "AstronautBaseline",
+        back_populates="astronaut",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # 1:N Relationship to assessments with cascade delete
+    assessments: Mapped[List["HealthAssessment"]] = relationship(
+        "HealthAssessment",
+        back_populates="astronaut",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # 1:N Relationship to alerts with cascade delete
+    alerts: Mapped[List["HealthAlert"]] = relationship(
+        "HealthAlert",
         back_populates="astronaut",
         cascade="all, delete-orphan",
         passive_deletes=True,

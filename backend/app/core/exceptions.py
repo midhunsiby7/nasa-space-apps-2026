@@ -42,3 +42,98 @@ class InvalidQueryParameterException(AppException):
             status_code=400,
             details={"parameter": parameter, "value": value},
         )
+
+
+class BaselineNotFoundException(AppException):
+    """Raised when a requested baseline reference does not exist."""
+
+    def __init__(self, astronaut_id: str, measurement_type: str, context: Optional[str] = None):
+        msg = f"Baseline for astronaut '{astronaut_id}' with metric '{measurement_type}'"
+        if context:
+            msg += f" in context '{context}'"
+        msg += " not found."
+        super().__init__(
+            code="BASELINE_NOT_FOUND",
+            message=msg,
+            status_code=404,
+            details={
+                "astronaut_id": astronaut_id,
+                "measurement_type": measurement_type,
+                "context": context,
+            },
+        )
+
+
+class IneligibleBaselineContextException(AppException):
+    """Raised when an attempt is made to calculate a baseline from an ineligible context."""
+
+    def __init__(self, context: str, message: Optional[str] = None):
+        msg = message or (
+            f"Context '{context}' is not eligible for physiological baseline generation. "
+            f"Baselines must use resting_cabin, sleep_cycle, exercise_active, or exercise_recovery."
+        )
+        super().__init__(
+            code="INELIGIBLE_BASELINE_CONTEXT",
+            message=msg,
+            status_code=400,
+            details={"context": context},
+        )
+
+
+class InsufficientMeasurementsException(AppException):
+    """Raised when insufficient valid comparable measurements exist to calculate a baseline."""
+
+    def __init__(self, astronaut_id: str, measurement_type: str, context: str, details: Optional[Any] = None):
+        super().__init__(
+            code="INSUFFICIENT_MEASUREMENTS",
+            message=(
+                f"Cannot calculate baseline: No valid comparable measurements found for astronaut "
+                f"'{astronaut_id}' with metric '{measurement_type}' in context '{context}'."
+            ),
+            status_code=422,
+            details=details or {
+                "astronaut_id": astronaut_id,
+                "measurement_type": measurement_type,
+                "context": context,
+            },
+        )
+
+
+class PreflightBaselineFinalizedException(AppException):
+    """Raised when an attempt is made to mutate or overwrite a finalized preflight baseline."""
+
+    def __init__(self, baseline_id: str, message: Optional[str] = None):
+        msg = message or (
+            f"Preflight baseline '{baseline_id}' has been finalized and is immutable. "
+            f"Finalized preflight benchmarks cannot be modified in place."
+        )
+        super().__init__(
+            code="PREFLIGHT_BASELINE_FINALIZED",
+            message=msg,
+            status_code=409,
+            details={"baseline_id": baseline_id},
+        )
+
+
+class AssessmentNotFoundException(AppException):
+    """Raised when a health assessment does not exist."""
+
+    def __init__(self, assessment_id: str):
+        super().__init__(
+            code="ASSESSMENT_NOT_FOUND",
+            message=f"Health assessment with id '{assessment_id}' not found.",
+            status_code=404,
+            details={"assessment_id": assessment_id},
+        )
+
+
+class AlertNotFoundException(AppException):
+    """Raised when a health alert does not exist."""
+
+    def __init__(self, alert_id: str):
+        super().__init__(
+            code="ALERT_NOT_FOUND",
+            message=f"Health alert with id '{alert_id}' not found.",
+            status_code=404,
+            details={"alert_id": alert_id},
+        )

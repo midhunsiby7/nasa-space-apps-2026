@@ -8,14 +8,18 @@ import {
   CartesianGrid,
   Tooltip,
   TooltipProps,
+  ReferenceLine,
+  ReferenceArea,
 } from 'recharts';
 import { Measurement } from '../../types/measurement';
+import { BaselineResponse } from '../../types/baseline';
 import { getMetricMeta, formatTimestamp, formatDataQuality, formatProvenance } from '../../utils/formatters';
 import { EmptyState } from '../common/EmptyState';
 
 interface TelemetryTimeSeriesChartProps {
   measurements: Measurement[];
   metricType: string;
+  baseline?: BaselineResponse | null;
 }
 
 interface ChartDataPoint {
@@ -25,6 +29,7 @@ interface ChartDataPoint {
   unit: string;
   source: string;
   context: string | null;
+  exercise_modality?: string | null;
   data_quality: string;
   is_synthetic: boolean;
 }
@@ -46,7 +51,7 @@ const CustomTelemetryTooltip: React.FC<TooltipProps<number, string>> = ({
         <span className="text-[11px] text-space-400">
           {formatTimestamp(data.rawTimestamp)}
         </span>
-        <span className={`text-[10px] px-1.5 py-0.2 rounded border ${provenance.badgeClass}`}>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${provenance.badgeClass}`}>
           {provenance.shortLabel}
         </span>
       </div>
@@ -67,11 +72,18 @@ const CustomTelemetryTooltip: React.FC<TooltipProps<number, string>> = ({
         </div>
         <div className="flex justify-between">
           <span className="text-space-400">Source:</span>
-          <span className="text-space-200 truncate max-w-[150px]">{data.source}</span>
+          <span className="text-space-200 truncate max-w-[150px]">{data.source || 'Source not specified'}</span>
         </div>
         {data.context && (
-          <div className="pt-1 text-[10px] text-space-400 italic">
-            Context: {data.context}
+          <div className="flex justify-between">
+            <span className="text-space-400">Context:</span>
+            <span className="text-telemetry-cyan truncate max-w-[150px]">{data.context}</span>
+          </div>
+        )}
+        {data.exercise_modality && (
+          <div className="flex justify-between">
+            <span className="text-space-400">Modality:</span>
+            <span className="text-amber-300 truncate max-w-[150px]">{data.exercise_modality}</span>
           </div>
         )}
       </div>
@@ -82,6 +94,7 @@ const CustomTelemetryTooltip: React.FC<TooltipProps<number, string>> = ({
 export const TelemetryTimeSeriesChart: React.FC<TelemetryTimeSeriesChartProps> = ({
   measurements,
   metricType,
+  baseline,
 }) => {
   const meta = getMetricMeta(metricType);
 
@@ -89,7 +102,7 @@ export const TelemetryTimeSeriesChart: React.FC<TelemetryTimeSeriesChartProps> =
     return (
       <EmptyState
         title="No Telemetry Series Data"
-        description={`No measurements available for metric "${meta.label}". Try selecting another telemetry metric or adjusting your time filter.`}
+        description={`No measurements available for metric "${meta.label}". Try selecting another telemetry metric or adjusting your filters.`}
       />
     );
   }
@@ -108,13 +121,17 @@ export const TelemetryTimeSeriesChart: React.FC<TelemetryTimeSeriesChartProps> =
       unit: m.unit,
       source: m.source,
       context: m.context,
+      exercise_modality: m.exercise_modality,
       data_quality: m.data_quality,
       is_synthetic: m.is_synthetic,
     };
   });
 
-  // Calculate dynamic domain
+  // Calculate dynamic domain encompassing observations and baseline envelope
   const values = chartData.map((d) => d.value);
+  if (baseline) {
+    values.push(baseline.envelope.q25, baseline.envelope.q75, baseline.envelope.median);
+  }
   const minVal = Math.min(...values);
   const maxVal = Math.max(...values);
   const padding = (maxVal - minVal) * 0.15 || 2;
@@ -136,10 +153,22 @@ export const TelemetryTimeSeriesChart: React.FC<TelemetryTimeSeriesChartProps> =
             {meta.label} Time-Series Observation
           </h4>
           <p className="font-mono text-[11px] text-space-400 mt-0.5">
-            {meta.description} • Reference Baseline: {meta.nominalRange}
+            {meta.description}
+            {baseline ? (
+              <span className="text-telemetry-cyan ml-1 font-semibold">
+                • Personal Median: {baseline.envelope.median} {baseline.unit} (IQR: {baseline.envelope.q25}–{baseline.envelope.q75})
+              </span>
+            ) : (
+              <span> • Standard Reference: {meta.nominalRange}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 font-mono text-xs">
+          {baseline && (
+            <span className="px-2 py-0.5 rounded bg-telemetry-cyan/15 border border-telemetry-cyan/30 text-telemetry-cyan text-[11px] font-semibold">
+              BASELINE OVERLAY ACTIVE
+            </span>
+          )}
           <span className="px-2 py-0.5 rounded bg-space-850 border border-space-700 text-space-300">
             {chartData.length} Data Points
           </span>
@@ -170,6 +199,37 @@ export const TelemetryTimeSeriesChart: React.FC<TelemetryTimeSeriesChartProps> =
               width={70}
             />
             <Tooltip content={<CustomTelemetryTooltip />} />
+
+            {/* Baseline IQR Envelope Band */}
+            {baseline && (
+              <ReferenceArea
+                y1={baseline.envelope.q25}
+                y2={baseline.envelope.q75}
+                fill="#38bdf8"
+                fillOpacity={0.08}
+                stroke="#38bdf8"
+                strokeOpacity={0.3}
+                strokeDasharray="4 4"
+              />
+            )}
+
+            {/* Baseline Median Reference Line */}
+            {baseline && (
+              <ReferenceLine
+                y={baseline.envelope.median}
+                stroke="#38bdf8"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+                label={{
+                  value: `Median ${baseline.envelope.median}`,
+                  fill: '#38bdf8',
+                  fontSize: 10,
+                  position: 'insideTopRight',
+                }}
+              />
+            )}
+
+            {/* Historical Telemetry Stream Line */}
             <Line
               type="monotone"
               dataKey="value"

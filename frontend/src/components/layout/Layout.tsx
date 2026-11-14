@@ -12,14 +12,20 @@ interface LayoutProps {
   astronauts: Astronaut[];
   selectedAstronautId: string | null;
   onSelectAstronaut: (id: string) => void;
-  availableMetrics: string[];
+  availableMetrics?: string[];
   selectedMetric: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   connectionState: ConnectionState;
   onOpenProvenanceGuide: () => void;
-  onRetryConnection: () => void;
-  onToggleDemoMode: () => void;
-  isDemoMode: boolean;
+  onRetryConnection?: () => void;
+  onToggleDemoMode?: () => void;
+  isDemoMode?: boolean;
+  activeAlertsCount?: number;
+  onOpenNonAnatomical?: () => void;
+  onToggleDemoGuide?: () => void;
+  isDemoGuideOpen?: boolean;
+  onOpenCommandPalette?: () => void;
+  onOpenEvidenceReport?: () => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -29,23 +35,33 @@ export const Layout: React.FC<LayoutProps> = ({
   astronauts,
   selectedAstronautId,
   onSelectAstronaut,
-  availableMetrics,
+  availableMetrics = [],
   selectedMetric,
   onSelectMetric,
   connectionState,
   onOpenProvenanceGuide,
   onRetryConnection,
   onToggleDemoMode,
-  isDemoMode,
+  isDemoMode = false,
+  activeAlertsCount = 0,
+  onOpenNonAnatomical,
+  onToggleDemoGuide,
+  isDemoGuideOpen = false,
+  onOpenCommandPalette,
+  onOpenEvidenceReport,
 }) => {
   return (
     <div className="flex min-h-screen flex-col bg-space-950 text-space-100">
       <Header
         connectionState={connectionState}
         onOpenProvenanceGuide={onOpenProvenanceGuide}
+        onToggleDemoGuide={onToggleDemoGuide}
+        isDemoGuideOpen={isDemoGuideOpen}
         onRetryConnection={onRetryConnection}
         onToggleDemoMode={onToggleDemoMode}
         isDemoMode={isDemoMode}
+        onOpenCommandPalette={onOpenCommandPalette}
+        onOpenEvidenceReport={onOpenEvidenceReport}
       />
       <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
         <Sidebar
@@ -57,6 +73,8 @@ export const Layout: React.FC<LayoutProps> = ({
           availableMetrics={availableMetrics}
           selectedMetric={selectedMetric}
           onSelectMetric={onSelectMetric}
+          activeAlertsCount={activeAlertsCount}
+          onOpenNonAnatomical={onOpenNonAnatomical}
         />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 telemetry-grid">
           {children}

@@ -1,10 +1,9 @@
-import React, { Suspense, useRef, useEffect, useState, Component, ErrorInfo } from 'react';
-import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { Human3DModel } from './Human3DModel';
 import { AnatomicalRegionId, ANATOMICAL_REGIONS } from './anatomyRegistry';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface AnatomySceneProps {
   selectedRegion: AnatomicalRegionId;
@@ -12,83 +11,141 @@ interface AnatomySceneProps {
   hoveredRegion: AnatomicalRegionId | null;
   onHoverRegion: (region: AnatomicalRegionId | null) => void;
   isWireframe?: boolean;
-  cameraResetKey?: number;
+  onFallbackTo2D: () => void;
+  resetTrigger?: number;
 }
 
-// Camera interpolator for smooth focus transitions
-const CameraController: React.FC<{
-  targetPosition: [number, number, number];
-  targetLookAt: [number, number, number];
-  resetTrigger: number;
-}> = ({ targetPosition, targetLookAt, resetTrigger }) => {
+/**
+ * Camera controller interpolating position and OrbitControls focus point
+ * when the user selects different anatomical regions.
+ */
+const CameraFocusController: React.FC<{
+  selectedRegion: AnatomicalRegionId;
+  controlsRef: React.RefObject<any>;
+  resetTrigger?: number;
+}> = ({ selectedRegion, controlsRef, resetTrigger }) => {
   const { camera } = useThree();
-  const controlsRef = useRef<any>(null);
-  const targetVec = useRef(new THREE.Vector3(...targetPosition));
-  const lookAtVec = useRef(new THREE.Vector3(...targetLookAt));
+  const targetConfig = ANATOMICAL_REGIONS[selectedRegion];
 
+  const defaultPosition = useMemo(() => new THREE.Vector3(0, 0.4, 2.8), []);
+  const defaultTarget = useMemo(() => new THREE.Vector3(0, 0.3, 0), []);
+
+  const desiredTarget = useMemo(() => {
+    return new THREE.Vector3(...targetConfig.cameraTarget);
+  }, [targetConfig]);
+
+  const desiredPosition = useMemo(() => {
+    return new THREE.Vector3(...targetConfig.cameraPosition);
+  }, [targetConfig]);
+
+  // Handle external reset button
+  const prevResetRef = useRef(resetTrigger);
   useEffect(() => {
-    targetVec.current.set(...targetPosition);
-    lookAtVec.current.set(...targetLookAt);
-  }, [targetPosition, targetLookAt, resetTrigger]);
+    if (resetTrigger !== undefined && resetTrigger !== prevResetRef.current) {
+      prevResetRef.current = resetTrigger;
+      camera.position.copy(defaultPosition);
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(defaultTarget);
+        controlsRef.current.update();
+      }
+    }
+  }, [resetTrigger, camera, controlsRef, defaultPosition, defaultTarget]);
 
-  useFrame(() => {
-    // Smooth lerp camera position
-    camera.position.lerp(targetVec.current, 0.04);
+  useFrame((_, delta) => {
+    const step = Math.min(delta * 3.2, 0.15);
+    camera.position.lerp(desiredPosition, step);
+    if (controlsRef.current) {
+      controlsRef.current.target.lerp(desiredTarget, step);
+      controlsRef.current.update();
+    }
+  });
+
+  return null;
+};
+
+/**
+ * Ground HUD Ring & Orientation Stage
+ */
+const HolographicFloorStage: React.FC = () => {
+  const ringRef = useRef<THREE.Group>(null);
+
+  useFrame((state) => {
+    if (ringRef.current) {
+      ringRef.current.rotation.z = state.clock.getElapsedTime() * 0.05;
+    }
   });
 
   return (
-    <OrbitControls
-      ref={controlsRef}
-      enableDamping
-      dampingFactor={0.06}
-      minDistance={1.6}
-      maxDistance={6.0}
-      target={lookAtVec.current}
-      maxPolarAngle={Math.PI / 2 + 0.15}
-    />
+    <group position={[0, -1.25, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* Outer rotating ring */}
+      <group ref={ringRef}>
+        <mesh>
+          <ringGeometry args={[1.1, 1.13, 64]} />
+          <meshBasicMaterial color="#0284c7" opacity={0.35} transparent side={THREE.DoubleSide} />
+        </mesh>
+        <mesh>
+          <ringGeometry args={[0.75, 0.77, 48]} />
+          <meshBasicMaterial color="#0ea5e9" opacity={0.2} transparent side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+
+      {/* Target Crosshair */}
+      <mesh>
+        <planeGeometry args={[2.4, 0.015]} />
+        <meshBasicMaterial color="#0284c7" opacity={0.15} transparent side={THREE.DoubleSide} />
+      </mesh>
+      <mesh rotation={[0, 0, Math.PI / 2]}>
+        <planeGeometry args={[2.4, 0.015]} />
+        <meshBasicMaterial color="#0284c7" opacity={0.15} transparent side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Center pedestal glow */}
+      <mesh>
+        <circleGeometry args={[0.35, 32]} />
+        <meshBasicMaterial color="#38bdf8" opacity={0.08} transparent side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   );
 };
 
-// WebGL Error Boundary
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
-}
-
-class WebGLErrorBoundary extends Component<{ children: React.ReactNode; onFallback: () => void }, ErrorBoundaryState> {
-  constructor(props: any) {
+/**
+ * WebGL Error Boundary to catch render failures gracefully and fall back to 2D
+ */
+class SceneErrorBoundary extends React.Component<
+  { onFallback: () => void; children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { onFallback: () => void; children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('WebGL / 3D Canvas initialization failure:', error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('AnatomyScene WebGL Error caught:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center p-8 text-center bg-space-950/90 rounded-lg border border-rose-500/30 text-space-200 min-h-[420px]">
-          <AlertTriangle className="h-10 w-10 text-rose-400 mb-3" />
-          <h4 className="font-mono text-sm font-bold text-rose-300 uppercase">
-            WebGL 3D Context Initialization Failed
+        <div className="flex h-full w-full flex-col items-center justify-center p-6 text-center bg-space-900 border border-amber-500/30 rounded-lg">
+          <div className="h-10 w-10 text-amber-400 mb-3 flex items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/30">
+            ⚠️
+          </div>
+          <h4 className="font-mono text-sm font-bold text-amber-300 uppercase tracking-wider">
+            WebGL Renderer Error
           </h4>
-          <p className="mt-1 text-xs text-space-400 max-w-md font-mono">
-            Your browser or environment could not create a hardware-accelerated WebGL context. You can still inspect all anatomical telemetry regions using the accessible controls.
+          <p className="font-mono text-xs text-space-400 mt-2 max-w-sm">
+            Hardware acceleration or WebGL context was interrupted. Reverting to interactive 2D anatomical schematic.
           </p>
           <button
-            onClick={() => {
-              this.setState({ hasError: false });
-              this.props.onFallback();
-            }}
-            className="mt-4 px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-600 text-xs font-mono text-space-200 inline-flex items-center gap-1.5"
+            onClick={() => this.props.onFallback()}
+            className="mt-4 px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 rounded text-xs font-mono transition-colors"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Retry WebGL Context
+            Switch to 2D View
           </button>
         </div>
       );
@@ -103,83 +160,90 @@ export const AnatomyScene: React.FC<AnatomySceneProps> = ({
   hoveredRegion,
   onHoverRegion,
   isWireframe = false,
-  cameraResetKey = 0,
+  onFallbackTo2D,
+  resetTrigger = 0,
 }) => {
-  const [webGLSupported, setWebGLSupported] = useState<boolean>(true);
+  const controlsRef = useRef<any>(null);
+  const [isWebGLSupported, setIsWebGLSupported] = useState<boolean>(true);
 
-  // Check WebGL support on mount
+  // Runtime WebGL check
   useEffect(() => {
     try {
       const canvas = document.createElement('canvas');
       const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
       if (!gl) {
-        setWebGLSupported(false);
+        setIsWebGLSupported(false);
+        onFallbackTo2D();
       }
     } catch {
-      setWebGLSupported(false);
+      setIsWebGLSupported(false);
+      onFallbackTo2D();
     }
-  }, []);
+  }, [onFallbackTo2D]);
 
-  const activeRegionDef = ANATOMICAL_REGIONS[selectedRegion];
-  const targetCamPos = activeRegionDef.cameraPosition;
-  const targetCamLook = activeRegionDef.cameraTarget;
-
-  if (!webGLSupported) {
+  if (!isWebGLSupported) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-space-950/90 rounded-lg border border-amber-500/30 text-space-200 min-h-[440px]">
-        <AlertTriangle className="h-10 w-10 text-amber-400 mb-3" />
-        <h4 className="font-mono text-sm font-bold text-amber-300 uppercase">
-          Hardware WebGL Acceleration Unavailable
-        </h4>
-        <p className="mt-1 text-xs text-space-400 max-w-md font-mono">
-          WebGL rendering is disabled or unavailable. Telemetry channels and anatomical mappings remain fully functional through the region inspector and navigation modules.
+      <div className="flex h-full w-full flex-col items-center justify-center p-6 text-center bg-space-900 rounded-lg">
+        <p className="font-mono text-xs text-space-400">
+          WebGL context unavailable. Active display mode set to 2D schematic.
         </p>
+        <button
+          onClick={onFallbackTo2D}
+          className="mt-3 px-3 py-1.5 rounded bg-space-800 text-xs font-mono text-telemetry-cyan border border-space-700"
+        >
+          View 2D Schematic
+        </button>
       </div>
     );
   }
 
   return (
-    <WebGLErrorBoundary onFallback={() => setWebGLSupported(false)}>
-      <div className="relative w-full h-[520px] rounded-lg overflow-hidden bg-space-950">
+    <SceneErrorBoundary onFallback={onFallbackTo2D}>
+      <div className="relative h-full w-full select-none overflow-hidden rounded-lg bg-gradient-to-b from-space-950 via-space-900 to-space-950">
         <Canvas
-          camera={{ position: [0, 0.4, 3.4], fov: 42 }}
+          camera={{ position: [0, 0.4, 2.8], fov: 45, near: 0.1, far: 20 }}
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+          className="h-full w-full"
         >
-          {/* Scientific Lighting Arrangement */}
-          <ambientLight intensity={0.4} color="#38bdf8" />
-          <directionalLight position={[3, 4, 3]} intensity={1.2} color="#ffffff" />
-          <directionalLight position={[-3, 2, -2]} intensity={0.6} color="#38bdf8" />
-          <pointLight position={[0, -2, 2]} intensity={0.3} color="#f43f5e" />
+          {/* Lighting */}
+          <ambientLight intensity={0.45} color="#94a3b8" />
+          <directionalLight position={[2, 4, 3]} intensity={1.1} color="#f8fafc" />
+          <directionalLight position={[-3, -1, -2]} intensity={0.6} color="#06b6d4" />
+          <pointLight position={[0, 0.4, 1.2]} intensity={0.5} distance={3} color="#38bdf8" />
+          <pointLight position={[0, -0.3, 0.8]} intensity={0.3} distance={2} color="#f59e0b" />
 
-          {/* Coordinate Grid Floor */}
-          <gridHelper args={[6, 12, '#273856', '#162032']} position={[0, -1.8, 0]} />
-
-          {/* Camera Controller with interpolation */}
-          <CameraController
-            targetPosition={targetCamPos}
-            targetLookAt={targetCamLook}
-            resetTrigger={cameraResetKey}
+          {/* Model */}
+          <Human3DModel
+            selectedRegion={selectedRegion}
+            onSelectRegion={onSelectRegion}
+            hoveredRegion={hoveredRegion}
+            onHoverRegion={onHoverRegion}
+            isWireframe={isWireframe}
           />
 
-          {/* 3D Human Anatomy Model */}
-          <Suspense
-            fallback={
-              <mesh position={[0, 0, 0]}>
-                <boxGeometry args={[0.5, 0.5, 0.5]} />
-                <meshBasicMaterial wireframe color="#38bdf8" />
-              </mesh>
-            }
-          >
-            <Human3DModel
-              selectedRegion={selectedRegion}
-              onSelectRegion={onSelectRegion}
-              hoveredRegion={hoveredRegion}
-              onHoverRegion={onHoverRegion}
-              isWireframe={isWireframe}
-            />
-          </Suspense>
+          {/* Floor Grid / Holographic Stage */}
+          <HolographicFloorStage />
+
+          {/* Orbit Controls */}
+          <OrbitControls
+            ref={controlsRef}
+            enableDamping
+            dampingFactor={0.06}
+            minDistance={1.1}
+            maxDistance={5.5}
+            maxPolarAngle={Math.PI / 2 + 0.25}
+            minPolarAngle={0.15}
+            enablePan={false}
+          />
+
+          {/* Smooth Camera Director */}
+          <CameraFocusController
+            selectedRegion={selectedRegion}
+            controlsRef={controlsRef}
+            resetTrigger={resetTrigger}
+          />
         </Canvas>
       </div>
-    </WebGLErrorBoundary>
+    </SceneErrorBoundary>
   );
 };
