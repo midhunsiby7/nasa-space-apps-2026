@@ -163,17 +163,19 @@ The automated test script (`scripts/test-integration.mjs`) verifies complete com
 | 17 | Context + Modality filtering | `GET ...?context=exercise_active&exercise_modality=ared_resistive` | ✓ PASS |
 | 18 | Baseline calculation eligibility guard (EVA rejected: 400) | `POST /api/v1/astronauts/{id}/baselines/calculate` | ✓ PASS |
 | 19 | Baseline data guard (Insufficient measurements: 422) | `POST /api/v1/astronauts/{id}/baselines/calculate` | ✓ PASS |
-| 20 | Statistical mathematical integrity ($Q_1 \le Median \le Q_3, \sigma_{\text{IQR}}$) | Non-Parametric Order Statistics Math | ✓ PASS |
-| 21 | Baseline listing schema validation | `GET /api/v1/astronauts/{id}/baselines` | ✓ PASS |
-| 22 | Single baseline lookup (404 for uncalculated envelope) | `GET /api/v1/astronauts/{id}/baselines/{type}` | ✓ PASS |
-| 23 | Uncalculated metric error handling (404) | `GET .../baselines/radiation_dose` | ✓ PASS |
-| 24 | Comparability engine: In-envelope observation ($72\text{ bpm} \in [68, 76]$) | Client Scientific Comparability Engine | ✓ PASS |
-| 25 | Comparability engine: Out-of-envelope observation ($95\text{ bpm} \notin [68, 76]$) | Client Scientific Comparability Engine | ✓ PASS |
-| 26 | Operational isolation: Rejection of EVA vs. resting cabin | Client Scientific Comparability Engine | ✓ PASS |
-| 27 | Modality isolation: Rejection of CEVIS aerobic vs. ARED resistive | Client Scientific Comparability Engine | ✓ PASS |
-| 28 | Physiological isolation: Rejection of superficial vs. core temp | Client Scientific Comparability Engine | ✓ PASS |
-| 29 | Wire alias normalization: `blood_oxygen` $\rightarrow$ `spo2` | Client Scientific Comparability Engine | ✓ PASS |
-| 30 | Missing baseline handling: Safe non-comparable result | Client Scientific Comparability Engine | ✓ PASS |
+| 20 | Baseline calculation success with populated data (200) | `POST /api/v1/astronauts/{id}/baselines/calculate` | ✓ PASS |
+| 21 | Statistical mathematical integrity ($Q_1 \le Median \le Q_3, \sigma_{\text{IQR}}$) | Non-Parametric Order Statistics Math | ✓ PASS |
+| 22 | Baseline listing schema & envelope validation | `GET /api/v1/astronauts/{id}/baselines` | ✓ PASS |
+| 23 | Single baseline lookup retrieves specific envelope (200) | `GET /api/v1/astronauts/{id}/baselines/{type}` | ✓ PASS |
+| 24 | Active baseline reference lookup verifies lifecycle status | `GET /api/v1/astronauts/{id}/baselines/active` | ✓ PASS |
+| 25 | Uncalculated metric error handling (404) | `GET .../baselines/radiation_dose` | ✓ PASS |
+| 26 | Comparability engine: In-envelope observation ($72\text{ bpm} \in [70, 74]$) | Client Scientific Comparability Engine | ✓ PASS |
+| 27 | Comparability engine: Out-of-envelope observation ($95\text{ bpm} \notin [70, 74]$) | Client Scientific Comparability Engine | ✓ PASS |
+| 28 | Operational isolation: Rejection of EVA vs. resting cabin | Client Scientific Comparability Engine | ✓ PASS |
+| 29 | Modality isolation: Rejection of CEVIS aerobic vs. ARED resistive | Client Scientific Comparability Engine | ✓ PASS |
+| 30 | Physiological isolation: Rejection of superficial vs. core temp | Client Scientific Comparability Engine | ✓ PASS |
+| 31 | Wire alias normalization: `blood_oxygen` $\rightarrow$ `spo2` | Client Scientific Comparability Engine | ✓ PASS |
+| 32 | Missing baseline handling: Safe non-comparable result | Client Scientific Comparability Engine | ✓ PASS |
 
 ---
 
@@ -182,7 +184,7 @@ The automated test script (`scripts/test-integration.mjs`) verifies complete com
 ```
 frontend/
 ├── scripts/
-│   └── test-integration.mjs             # 30-point end-to-end integration test runner
+│   └── test-integration.mjs             # 32-point end-to-end integration test runner
 ├── src/
 │   ├── components/
 │   │   ├── anatomy/                     # 3D Human Anatomy module (Three.js & R3F)

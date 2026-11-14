@@ -34,6 +34,17 @@ export interface BaselineResponse {
   measurement_method: string | null;
   sensor_model: string | null;
   unit: string;
+
+  // Lifecycle Attributes (Phase 2C / PR #9)
+  baseline_type?: 'preflight' | 'inflight';
+  maturity?: 'insufficient' | 'provisional' | 'established';
+  version?: number;
+  is_active?: boolean;
+  is_finalized?: boolean;
+  supersedes_baseline_id?: string | null;
+  maturity_evaluated_at?: string | null;
+  maturity_criteria_snapshot?: string | null;
+
   envelope: PersonalOperationalEnvelope;
   quality_summary: BaselineQualitySummary;
   algorithm_version: string;
@@ -50,6 +61,7 @@ export interface BaselineListResponse {
 export interface BaselineCalculationRequest {
   measurement_type: string;
   context?: string;
+  baseline_type?: string;
   exercise_modality?: string | null;
   measurement_site?: string | null;
   measurement_method?: string | null;

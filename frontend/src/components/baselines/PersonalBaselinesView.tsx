@@ -473,9 +473,16 @@ export const PersonalBaselinesView: React.FC<PersonalBaselinesViewProps> = ({
               {activeBaseline && (
                 <div className="rounded-lg bg-space-850 p-5 border border-space-700/80 shadow-hud-card space-y-3 font-mono">
                   <div className="flex items-center justify-between pb-2 border-b border-space-800">
-                    <span className="text-xs font-bold uppercase tracking-wider text-space-200">
-                      Statistical Envelope Parameters
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-space-200">
+                        Statistical Envelope Parameters
+                      </span>
+                      {activeBaseline.maturity && (
+                        <span className="px-1.5 py-0.5 rounded bg-space-800 border border-space-700 text-[10px] uppercase text-telemetry-cyan">
+                          {activeBaseline.maturity} (v{activeBaseline.version || 1})
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] text-space-400">
                       ID: <code className="text-telemetry-cyan">{activeBaseline.id}</code>
                     </span>
