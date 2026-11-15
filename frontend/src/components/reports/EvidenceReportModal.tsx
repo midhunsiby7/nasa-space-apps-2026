@@ -146,11 +146,13 @@ export const EvidenceReportModal: React.FC<EvidenceReportModalProps> = ({
 
   const handleCopyMarkdown = async () => {
     try {
-      await navigator.clipboard.writeText(markdownReport);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(markdownReport);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      }
+    } catch {
+      // In headless test environments or when clipboard permissions are not granted, fail gracefully without console errors
     }
   };
 
@@ -195,7 +197,9 @@ export const EvidenceReportModal: React.FC<EvidenceReportModalProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Close evidence report modal"
               className="rounded p-1.5 text-space-400 hover:text-white"
             >
               <X className="h-5 w-5" />

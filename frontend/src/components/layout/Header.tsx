@@ -2,38 +2,41 @@ import React, { useEffect, useState } from 'react';
 import {
   Orbit,
   Radio,
-  ShieldCheck,
-  HelpCircle,
-  Sparkles,
   RefreshCw,
   AlertCircle,
   PlayCircle,
+  Users,
 } from 'lucide-react';
 import { ConnectionState } from '../../types/api';
+import { Astronaut } from '../../types/astronaut';
+
+export type MainAppPage = 'intro' | 'roster' | 'cockpit';
 
 interface HeaderProps {
   connectionState: ConnectionState;
-  onOpenProvenanceGuide: () => void;
   onRetryConnection?: () => void;
   onToggleDemoMode?: () => void;
   isDemoMode?: boolean;
-  onToggleDemoGuide?: () => void;
-  isDemoGuideOpen?: boolean;
-  onOpenCommandPalette?: () => void;
-  onOpenEvidenceReport?: () => void;
+  // Navigation props
+  currentPage?: MainAppPage;
+  onNavigatePage?: (page: MainAppPage) => void;
+  astronauts?: Astronaut[];
+  selectedAstronautId?: string | null;
+  onSelectAstronaut?: (id: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   connectionState,
-  onOpenProvenanceGuide,
   onRetryConnection,
   onToggleDemoMode,
   isDemoMode = false,
-  onToggleDemoGuide,
-  isDemoGuideOpen = false,
-  onOpenCommandPalette,
-  onOpenEvidenceReport,
+  currentPage = 'cockpit',
+  onNavigatePage,
+  astronauts = [],
+  selectedAstronautId,
+  onSelectAstronaut,
 }) => {
+  const isCockpit = currentPage === 'cockpit';
   const [utcTime, setUtcTime] = useState<string>('');
 
   useEffect(() => {
@@ -47,107 +50,118 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-space-700/80 bg-space-950/90 backdrop-blur px-4 lg:px-6 py-2.5">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur px-4 lg:px-6 py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Brand identity */}
+        {/* Brand identity & Page Breadcrumbs */}
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-space-850 border border-telemetry-cyan/40 text-telemetry-cyan shadow-hud-glow">
+          <button
+            type="button"
+            onClick={() => onNavigatePage && onNavigatePage('intro')}
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-telemetry-cyan/40 text-telemetry-cyan shadow-sm hover:border-telemetry-cyan transition-colors"
+            title="Return to COSMOLOOKUP Introduction"
+          >
             <Orbit className="h-5 w-5 animate-pulse" />
-          </div>
+          </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-base font-bold tracking-wider text-space-100">
+              <button
+                type="button"
+                onClick={() => onNavigatePage && onNavigatePage('intro')}
+                className="font-mono text-base font-bold tracking-wider text-slate-900 hover:text-telemetry-cyan transition-colors text-left"
+              >
                 COSMOLOOKUP
-              </span>
-              <span className="rounded bg-telemetry-cyan/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-telemetry-cyan border border-telemetry-cyan/30">
+              </button>
+              <span className="rounded bg-sky-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-telemetry-cyan border border-sky-200">
                 v1.0
               </span>
             </div>
-            <p className="text-[11px] text-space-400 font-mono tracking-wide hidden sm:block">
-              ASTRONAUT HEALTH TELEMETRY &amp; PHYSIOLOGICAL OBSERVATION
+            <p className="text-[11px] text-slate-500 font-mono tracking-wide hidden sm:block">
+              ASTRONAUT HEALTH TELEMETRY &amp; DECISION SUPPORT
             </p>
           </div>
         </div>
 
-        {/* Center: Mission Clock & Signal */}
-        <div className="hidden md:flex items-center gap-4 bg-space-900/80 px-3 py-1.5 rounded border border-space-700/60 font-mono text-xs">
-          <div className="flex items-center gap-2 text-space-300">
+        {/* Quick Crew Navigation Button */}
+        {onNavigatePage && (
+          <div className="flex items-center gap-2">
+            {currentPage !== 'roster' && (
+              <button
+                type="button"
+                onClick={() => onNavigatePage('roster')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 hover:border-telemetry-cyan/60 font-mono text-xs font-semibold text-slate-700 hover:text-telemetry-cyan transition-colors shadow-sm"
+              >
+                <Users className="h-3.5 w-3.5 text-telemetry-cyan" />
+                <span>Crew</span>
+              </button>
+            )}
+            {currentPage === 'cockpit' && (
+              <button
+                type="button"
+                onClick={() => onNavigatePage('intro')}
+                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 font-mono text-xs transition-colors"
+              >
+                <span>Intro</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Mission Clock & Active Crew Member Selector */}
+        <div className={`${!isCockpit ? 'hidden' : 'hidden lg:flex'} items-center gap-3`}>
+          {/* Active Astronaut Quick Dropdown (when in cockpit) */}
+          {astronauts.length > 0 && onSelectAstronaut && currentPage === 'cockpit' && (
+            <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 font-mono text-xs">
+              <span className="text-[10px] text-slate-400 uppercase">Crew:</span>
+              <select
+                value={selectedAstronautId || ''}
+                onChange={(e) => onSelectAstronaut(e.target.value)}
+                className="bg-transparent text-telemetry-cyan font-semibold focus:outline-none cursor-pointer"
+              >
+                {astronauts.map((a) => (
+                  <option key={a.id} value={a.id} className="bg-white text-slate-900">
+                    {a.name} ({a.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Telemetry Clock */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 font-mono text-xs text-slate-700">
             <Radio className="h-3.5 w-3.5 text-telemetry-emerald animate-pulse" />
-            <span className="text-[11px] text-space-400">TELEMETRY CLOCK:</span>
-            <span className="text-telemetry-cyan font-semibold tracking-wider">{utcTime || 'SYNCHRONIZING...'}</span>
+            <span className="text-[11px] text-slate-400">UTC:</span>
+            <span className="text-telemetry-cyan font-semibold tracking-wider">
+              {utcTime || 'SYNCHRONIZING...'}
+            </span>
           </div>
         </div>
 
         {/* Right Controls & Connection State */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Quick Command Palette Button */}
-          {onOpenCommandPalette && (
-            <button
-              onClick={onOpenCommandPalette}
-              aria-label="Open Command Palette (Ctrl+K)"
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-850 hover:bg-space-800 border border-space-700 text-xs font-mono text-space-300 hover:text-white transition-colors"
-              title="Open Command Palette (Ctrl+K / Cmd+K)"
-            >
-              <span>Command</span>
-              <kbd className="px-1 py-0.5 rounded bg-space-800 border border-space-650 text-[10px] text-telemetry-cyan font-semibold">
-                Ctrl+K
-              </kbd>
-            </button>
-          )}
-
-          {/* Quick Evidence Report Button */}
-          {onOpenEvidenceReport && (
-            <button
-              onClick={onOpenEvidenceReport}
-              aria-label="Open Crew Evidence Report"
-              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-850 hover:bg-space-800 border border-space-700 text-xs font-mono text-space-300 hover:text-white transition-colors"
-              title="Open Crew Evidence Report"
-            >
-              <ShieldCheck className="h-3.5 w-3.5 text-sky-400" />
-              <span>Report</span>
-            </button>
-          )}
-
-          {/* Judge Demo Walkthrough Guide Button */}
-          {onToggleDemoGuide && (
-            <button
-              onClick={onToggleDemoGuide}
-              aria-label="Toggle Judge Demonstration Flow"
-              className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold transition-all ${
-                isDemoGuideOpen
-                  ? 'bg-telemetry-cyan text-space-950 shadow-hud-glow'
-                  : 'bg-space-800 hover:bg-space-750 text-telemetry-cyan border border-telemetry-cyan/40'
-              }`}
-              title="Launch the 10-step guided demonstration sequence for judges"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>Demo Tour</span>
-            </button>
-          )}
-
-          {/* Data Provenance Guide Button */}
-          <button
-            onClick={onOpenProvenanceGuide}
-            aria-label="Inspect Data Provenance & Scientific Integrity Standard"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-space-850 hover:bg-space-800 border border-space-700 text-xs font-mono text-space-300 hover:text-space-100 transition-colors"
-            title="Inspect Data Provenance & Scientific Integrity Standard"
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-telemetry-cyan" />
-            <span className="hidden sm:inline">Provenance</span>
-            <HelpCircle className="h-3 w-3 text-space-500" />
-          </button>
-
           {/* Connection status badges */}
           {connectionState === 'connected' && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
-              <span className="font-semibold">API CONNECTED</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-mono">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span className="font-semibold">ONLINE</span>
+              </div>
+              {onToggleDemoMode && (
+                <button
+                  onClick={onToggleDemoMode}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-[11px] font-mono text-slate-600 hover:text-amber-700 transition-colors"
+                  title={isDemoMode ? 'Demo Mode Active - Click to toggle' : 'Switch to offline demonstration dataset'}
+                  aria-label="Toggle Demonstration Mode"
+                >
+                  <PlayCircle className="h-3 w-3 text-amber-600" />
+                  <span className="hidden sm:inline">{isDemoMode ? 'Demo ON' : 'Demo'}</span>
+                </button>
+              )}
             </div>
           )}
 
           {connectionState === 'connecting' && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-mono">
-              <RefreshCw className="h-3 w-3 animate-spin text-sky-400" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 text-xs font-mono">
+              <RefreshCw className="h-3 w-3 animate-spin text-sky-600" />
               <span>CONNECTING...</span>
             </div>
           )}
@@ -155,59 +169,21 @@ export const Header: React.FC<HeaderProps> = ({
           {connectionState === 'offline' && (
             <div className="flex items-center gap-2">
               <div
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-mono"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-mono"
                 title="FastAPI backend service is offline at http://localhost:8000/api/v1"
               >
-                <AlertCircle className="h-3.5 w-3.5 text-rose-400" />
-                <span>BACKEND OFFLINE</span>
+                <AlertCircle className="h-3 w-3 text-rose-600" />
+                <span className="font-semibold">OFFLINE</span>
               </div>
               {onRetryConnection && (
                 <button
                   onClick={onRetryConnection}
-                  className="p-1 rounded bg-space-800 hover:bg-space-750 text-space-300 hover:text-space-100 border border-space-700 text-xs font-mono"
-                  title="Retry connecting to backend"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs font-mono text-slate-700 transition-colors"
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Retry</span>
                 </button>
               )}
-              {onToggleDemoMode && (
-                <button
-                  onClick={onToggleDemoMode}
-                  className="flex items-center gap-1 px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-[11px] font-mono text-amber-300"
-                  title="Launch offline synthetic demonstration dataset"
-                >
-                  <PlayCircle className="h-3 w-3 text-amber-400" />
-                  <span>Demo Mode</span>
-                </button>
-              )}
-            </div>
-          )}
-
-          {connectionState === 'offline_demo' && (
-            <div className="flex items-center gap-2">
-              <div
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono"
-                title="Operating with synthetic demonstration telemetry (offline simulation)"
-              >
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
-                <span>OFFLINE DEMO MODE</span>
-              </div>
-              {isDemoMode && onToggleDemoMode && (
-                <button
-                  onClick={onToggleDemoMode}
-                  className="px-2 py-0.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 text-[11px] font-mono text-space-300 hover:text-space-100"
-                  title="Switch back to live backend API requests"
-                >
-                  Live API
-                </button>
-              )}
-            </div>
-          )}
-
-          {connectionState === 'error' && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-mono">
-              <AlertCircle className="h-3.5 w-3.5 text-rose-400" />
-              <span>SERVER ERROR</span>
             </div>
           )}
         </div>

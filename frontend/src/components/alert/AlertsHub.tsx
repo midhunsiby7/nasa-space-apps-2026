@@ -363,8 +363,8 @@ export const AlertsHub: React.FC<AlertsHubProps> = ({
                 disabled={isSubmitting}
                 className={`px-4 py-1.5 rounded text-xs font-mono font-bold transition-colors ${
                   actionModal.type === 'acknowledge'
-                    ? 'bg-telemetry-cyan text-space-950 hover:bg-telemetry-cyan/90'
-                    : 'bg-telemetry-emerald text-space-950 hover:bg-telemetry-emerald/90'
+                    ? 'bg-telemetry-cyan text-white hover:bg-telemetry-cyan/90'
+                    : 'bg-telemetry-emerald text-white hover:bg-telemetry-emerald/90'
                 }`}
               >
                 {isSubmitting ? 'Updating...' : `Confirm ${actionModal.type === 'acknowledge' ? 'Acknowledge' : 'Resolve'}`}

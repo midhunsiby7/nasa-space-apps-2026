@@ -1,5 +1,5 @@
 import React from 'react';
-import { Header } from './Header';
+import { Header, MainAppPage } from './Header';
 import { Sidebar, ActiveTab } from './Sidebar';
 import { Astronaut } from '../../types/astronaut';
 import { MeasurementType } from '../../types/measurement';
@@ -16,16 +16,13 @@ interface LayoutProps {
   selectedMetric: MeasurementType;
   onSelectMetric: (metric: MeasurementType) => void;
   connectionState: ConnectionState;
-  onOpenProvenanceGuide: () => void;
   onRetryConnection?: () => void;
   onToggleDemoMode?: () => void;
   isDemoMode?: boolean;
-  activeAlertsCount?: number;
   onOpenNonAnatomical?: () => void;
-  onToggleDemoGuide?: () => void;
-  isDemoGuideOpen?: boolean;
-  onOpenCommandPalette?: () => void;
-  onOpenEvidenceReport?: () => void;
+  // Enhanced top-level navigation props
+  currentPage?: MainAppPage;
+  onNavigatePage?: (page: MainAppPage) => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -39,44 +36,56 @@ export const Layout: React.FC<LayoutProps> = ({
   selectedMetric,
   onSelectMetric,
   connectionState,
-  onOpenProvenanceGuide,
   onRetryConnection,
   onToggleDemoMode,
   isDemoMode = false,
-  activeAlertsCount = 0,
   onOpenNonAnatomical,
-  onToggleDemoGuide,
-  isDemoGuideOpen = false,
-  onOpenCommandPalette,
-  onOpenEvidenceReport,
+  currentPage = 'cockpit',
+  onNavigatePage,
 }) => {
+  const isDedicatedPageView = currentPage === 'roster' || currentPage === 'intro';
+  const showHeader = currentPage !== 'intro';
+
   return (
-    <div className="flex min-h-screen flex-col bg-space-950 text-space-100">
-      <Header
-        connectionState={connectionState}
-        onOpenProvenanceGuide={onOpenProvenanceGuide}
-        onToggleDemoGuide={onToggleDemoGuide}
-        isDemoGuideOpen={isDemoGuideOpen}
-        onRetryConnection={onRetryConnection}
-        onToggleDemoMode={onToggleDemoMode}
-        isDemoMode={isDemoMode}
-        onOpenCommandPalette={onOpenCommandPalette}
-        onOpenEvidenceReport={onOpenEvidenceReport}
-      />
-      <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={onTabChange}
+    <div className="flex min-h-screen flex-col bg-white text-slate-900">
+      {/* Hide top horizontal navigation bar when on intro page */}
+      {showHeader && (
+        <Header
+          connectionState={connectionState}
+          onRetryConnection={onRetryConnection}
+          onToggleDemoMode={onToggleDemoMode}
+          isDemoMode={isDemoMode}
+          currentPage={currentPage}
+          onNavigatePage={onNavigatePage}
           astronauts={astronauts}
           selectedAstronautId={selectedAstronautId}
           onSelectAstronaut={onSelectAstronaut}
-          availableMetrics={availableMetrics}
-          selectedMetric={selectedMetric}
-          onSelectMetric={onSelectMetric}
-          activeAlertsCount={activeAlertsCount}
-          onOpenNonAnatomical={onOpenNonAnatomical}
         />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 telemetry-grid">
+      )}
+      <div className="flex flex-1 flex-col lg:flex-row overflow-hidden bg-white">
+        {/* Render operational sidebar in Cockpit mode only */}
+        {!isDedicatedPageView && (
+          <Sidebar
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            astronauts={astronauts}
+            selectedAstronautId={selectedAstronautId}
+            onSelectAstronaut={onSelectAstronaut}
+            availableMetrics={availableMetrics}
+            selectedMetric={selectedMetric}
+            onSelectMetric={onSelectMetric}
+            onOpenNonAnatomical={onOpenNonAnatomical}
+          />
+        )}
+        <main
+          className={`flex-1 overflow-y-auto telemetry-grid bg-white ${
+            currentPage === 'intro'
+              ? 'p-4 sm:p-6 lg:p-8 flex items-center justify-center'
+              : isDedicatedPageView
+              ? 'p-4 sm:p-6 lg:p-8'
+              : 'p-4 lg:p-6'
+          }`}
+        >
           {children}
         </main>
       </div>

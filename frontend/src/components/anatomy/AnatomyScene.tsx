@@ -1,15 +1,22 @@
-import React, { useRef, useMemo, useState, useEffect } from 'react';
+import React, { useRef, useMemo, useState, useEffect, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
-import { Human3DModel } from './Human3DModel';
-import { AnatomicalRegionId, ANATOMICAL_REGIONS } from './anatomyRegistry';
+import { HumanAnatomyModel } from './HumanAnatomyModel';
+import {
+  AnatomyComponentId,
+  AnatomyViewMode,
+  ANATOMY_COMPONENTS,
+} from './anatomyModel';
+import { ComponentWarningState } from './anatomyWarnings';
 
 interface AnatomySceneProps {
-  selectedRegion: AnatomicalRegionId;
-  onSelectRegion: (region: AnatomicalRegionId) => void;
-  hoveredRegion: AnatomicalRegionId | null;
-  onHoverRegion: (region: AnatomicalRegionId | null) => void;
+  selectedComponent: AnatomyComponentId | null;
+  onSelectComponent: (component: AnatomyComponentId) => void;
+  hoveredComponent: AnatomyComponentId | null;
+  onHoverComponent: (component: AnatomyComponentId | null) => void;
+  warningStates: Record<AnatomyComponentId, ComponentWarningState>;
+  viewMode: AnatomyViewMode;
   isWireframe?: boolean;
   onFallbackTo2D: () => void;
   resetTrigger?: number;
@@ -17,26 +24,31 @@ interface AnatomySceneProps {
 
 /**
  * Camera controller interpolating position and OrbitControls focus point
- * when the user selects different anatomical regions.
+ * when the user selects different anatomical components.
  */
 const CameraFocusController: React.FC<{
-  selectedRegion: AnatomicalRegionId;
+  selectedComponent: AnatomyComponentId | null;
   controlsRef: React.RefObject<any>;
   resetTrigger?: number;
-}> = ({ selectedRegion, controlsRef, resetTrigger }) => {
+}> = ({ selectedComponent, controlsRef, resetTrigger }) => {
   const { camera } = useThree();
-  const targetConfig = ANATOMICAL_REGIONS[selectedRegion];
 
-  const defaultPosition = useMemo(() => new THREE.Vector3(0, 0.4, 2.8), []);
-  const defaultTarget = useMemo(() => new THREE.Vector3(0, 0.3, 0), []);
+  const defaultPosition = useMemo(() => new THREE.Vector3(0, 0.05, 2.3), []);
+  const defaultTarget = useMemo(() => new THREE.Vector3(0, 0, 0), []);
 
   const desiredTarget = useMemo(() => {
-    return new THREE.Vector3(...targetConfig.cameraTarget);
-  }, [targetConfig]);
+    if (!selectedComponent || !ANATOMY_COMPONENTS[selectedComponent]) {
+      return defaultTarget;
+    }
+    return new THREE.Vector3(...ANATOMY_COMPONENTS[selectedComponent].targetPosition);
+  }, [selectedComponent, defaultTarget]);
 
   const desiredPosition = useMemo(() => {
-    return new THREE.Vector3(...targetConfig.cameraPosition);
-  }, [targetConfig]);
+    if (!selectedComponent || !ANATOMY_COMPONENTS[selectedComponent]) {
+      return defaultPosition;
+    }
+    return new THREE.Vector3(...ANATOMY_COMPONENTS[selectedComponent].cameraPosition);
+  }, [selectedComponent, defaultPosition]);
 
   // Handle external reset button
   const prevResetRef = useRef(resetTrigger);
@@ -64,7 +76,7 @@ const CameraFocusController: React.FC<{
 };
 
 /**
- * Ground HUD Ring & Orientation Stage
+ * Ground HUD Ring & Holographic Pedestal Stage
  */
 const HolographicFloorStage: React.FC = () => {
   const ringRef = useRef<THREE.Group>(null);
@@ -76,32 +88,32 @@ const HolographicFloorStage: React.FC = () => {
   });
 
   return (
-    <group position={[0, -1.25, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <group position={[0, -0.98, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       {/* Outer rotating ring */}
       <group ref={ringRef}>
         <mesh>
-          <ringGeometry args={[1.1, 1.13, 64]} />
+          <ringGeometry args={[0.9, 0.92, 64]} />
           <meshBasicMaterial color="#0284c7" opacity={0.35} transparent side={THREE.DoubleSide} />
         </mesh>
         <mesh>
-          <ringGeometry args={[0.75, 0.77, 48]} />
+          <ringGeometry args={[0.65, 0.67, 48]} />
           <meshBasicMaterial color="#0ea5e9" opacity={0.2} transparent side={THREE.DoubleSide} />
         </mesh>
       </group>
 
       {/* Target Crosshair */}
       <mesh>
-        <planeGeometry args={[2.4, 0.015]} />
+        <planeGeometry args={[2.0, 0.012]} />
         <meshBasicMaterial color="#0284c7" opacity={0.15} transparent side={THREE.DoubleSide} />
       </mesh>
       <mesh rotation={[0, 0, Math.PI / 2]}>
-        <planeGeometry args={[2.4, 0.015]} />
+        <planeGeometry args={[2.0, 0.012]} />
         <meshBasicMaterial color="#0284c7" opacity={0.15} transparent side={THREE.DoubleSide} />
       </mesh>
 
       {/* Center pedestal glow */}
       <mesh>
-        <circleGeometry args={[0.35, 32]} />
+        <circleGeometry args={[0.4, 32]} />
         <meshBasicMaterial color="#38bdf8" opacity={0.08} transparent side={THREE.DoubleSide} />
       </mesh>
     </group>
@@ -154,11 +166,24 @@ class SceneErrorBoundary extends React.Component<
   }
 }
 
+function LoadingCanvasFallback() {
+  return (
+    <Html center>
+      <div className="flex flex-col items-center gap-2 text-center p-3 rounded bg-space-900/90 border border-telemetry-cyan/30 text-telemetry-cyan font-mono text-xs">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-telemetry-cyan border-t-transparent" />
+        <span>STREAMING 3D ANATOMICAL MESH...</span>
+      </div>
+    </Html>
+  );
+}
+
 export const AnatomyScene: React.FC<AnatomySceneProps> = ({
-  selectedRegion,
-  onSelectRegion,
-  hoveredRegion,
-  onHoverRegion,
+  selectedComponent,
+  onSelectComponent,
+  hoveredComponent,
+  onHoverComponent,
+  warningStates,
+  viewMode,
   isWireframe = false,
   onFallbackTo2D,
   resetTrigger = 0,
@@ -201,25 +226,29 @@ export const AnatomyScene: React.FC<AnatomySceneProps> = ({
     <SceneErrorBoundary onFallback={onFallbackTo2D}>
       <div className="relative h-full w-full select-none overflow-hidden rounded-lg bg-gradient-to-b from-space-950 via-space-900 to-space-950">
         <Canvas
-          camera={{ position: [0, 0.4, 2.8], fov: 45, near: 0.1, far: 20 }}
+          camera={{ position: [0, 0.05, 2.3], fov: 45, near: 0.1, far: 20 }}
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
           className="h-full w-full"
         >
           {/* Lighting */}
-          <ambientLight intensity={0.45} color="#94a3b8" />
-          <directionalLight position={[2, 4, 3]} intensity={1.1} color="#f8fafc" />
-          <directionalLight position={[-3, -1, -2]} intensity={0.6} color="#06b6d4" />
+          <ambientLight intensity={0.5} color="#cbd5e1" />
+          <directionalLight position={[2, 4, 3]} intensity={1.2} color="#f8fafc" />
+          <directionalLight position={[-3, -1, -2]} intensity={0.65} color="#06b6d4" />
           <pointLight position={[0, 0.4, 1.2]} intensity={0.5} distance={3} color="#38bdf8" />
-          <pointLight position={[0, -0.3, 0.8]} intensity={0.3} distance={2} color="#f59e0b" />
+          <pointLight position={[0, -0.3, 0.8]} intensity={0.35} distance={2} color="#f59e0b" />
 
-          {/* Model */}
-          <Human3DModel
-            selectedRegion={selectedRegion}
-            onSelectRegion={onSelectRegion}
-            hoveredRegion={hoveredRegion}
-            onHoverRegion={onHoverRegion}
-            isWireframe={isWireframe}
-          />
+          {/* Suspense-wrapped 3D Model */}
+          <Suspense fallback={<LoadingCanvasFallback />}>
+            <HumanAnatomyModel
+              selectedComponent={selectedComponent}
+              onSelectComponent={onSelectComponent}
+              hoveredComponent={hoveredComponent}
+              onHoverComponent={onHoverComponent}
+              warningStates={warningStates}
+              viewMode={viewMode}
+              isWireframe={isWireframe}
+            />
+          </Suspense>
 
           {/* Floor Grid / Holographic Stage */}
           <HolographicFloorStage />
@@ -229,8 +258,8 @@ export const AnatomyScene: React.FC<AnatomySceneProps> = ({
             ref={controlsRef}
             enableDamping
             dampingFactor={0.06}
-            minDistance={1.1}
-            maxDistance={5.5}
+            minDistance={0.8}
+            maxDistance={4.5}
             maxPolarAngle={Math.PI / 2 + 0.25}
             minPolarAngle={0.15}
             enablePan={false}
@@ -238,7 +267,7 @@ export const AnatomyScene: React.FC<AnatomySceneProps> = ({
 
           {/* Smooth Camera Director */}
           <CameraFocusController
-            selectedRegion={selectedRegion}
+            selectedComponent={selectedComponent}
             controlsRef={controlsRef}
             resetTrigger={resetTrigger}
           />

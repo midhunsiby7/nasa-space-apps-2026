@@ -287,7 +287,7 @@ export const JudgeDemoController: React.FC<JudgeDemoControllerProps> = ({
 
             <button
               onClick={() => handleExecuteStep(currentStep)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-telemetry-cyan hover:bg-telemetry-cyan/90 text-space-950 font-mono text-xs font-bold transition-all shadow-hud-glow"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-telemetry-cyan hover:bg-telemetry-cyan/90 text-white font-mono text-xs font-bold transition-all shadow-hud-glow"
             >
               <Play className="h-3 w-3 fill-current" />
               <span>{currentStep.actionLabel}</span>

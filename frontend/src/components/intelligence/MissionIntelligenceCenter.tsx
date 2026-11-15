@@ -558,7 +558,7 @@ export const MissionIntelligenceCenter: React.FC<MissionIntelligenceCenterProps>
               </button>
               <button
                 onClick={handleSymptomSubmit}
-                className="px-4 py-1.5 rounded bg-purple-500 hover:bg-purple-400 text-xs font-mono font-bold text-space-950"
+                className="px-4 py-1.5 rounded bg-purple-500 hover:bg-purple-400 text-xs font-mono font-bold text-white"
               >
                 Synthesize Assessment
               </button>

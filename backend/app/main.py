@@ -13,6 +13,7 @@ from app.database.connection import engine
 from app.database.base import Base
 import app.models  # Registers models with Base.metadata
 from app.api.v1.router import api_router
+from app.repository.research_repo import get_research_repository
 from sqlalchemy import text
 
 
@@ -60,10 +61,19 @@ def _migrate_sqlite_columns() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle event handler for database initialization and schema migration."""
+    """Lifecycle event handler for database initialization, schema migration, and research catalogue check."""
     # Ensure tables exist in SQLite on startup
     Base.metadata.create_all(bind=engine)
     _migrate_sqlite_columns()
+
+    # Initialize research repository:
+    # Gracefully enters documented unavailable state if catalogue file is missing;
+    # Fails loudly with actionable error if file exists but is corrupt.
+    repo = get_research_repository()
+    if not repo.is_available:
+        # Documented unavailable state; application startup succeeds without breaking operational features
+        pass
+
     yield
 
 

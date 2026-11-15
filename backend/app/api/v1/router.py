@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     trends,
     assessments,
     alerts,
+    research,
 )
 
 api_router = APIRouter()
@@ -17,3 +18,4 @@ api_router.include_router(baselines.router)
 api_router.include_router(trends.router)
 api_router.include_router(assessments.router)
 api_router.include_router(alerts.router)
+api_router.include_router(research.router)
