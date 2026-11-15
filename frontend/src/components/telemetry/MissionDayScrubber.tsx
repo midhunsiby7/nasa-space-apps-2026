@@ -52,7 +52,7 @@ export const MissionDayScrubber: React.FC<MissionDayScrubberProps> = ({
             onClick={() => onTimeFilterChange('8h')}
             className={`px-2.5 py-1 rounded text-xs font-mono border transition-colors ${
               timeFilter === '8h'
-                ? 'bg-telemetry-cyan text-space-950 font-bold border-telemetry-cyan'
+                ? 'bg-telemetry-cyan text-white font-bold border-telemetry-cyan'
                 : 'bg-space-900 text-space-300 border-space-700 hover:bg-space-800'
             }`}
           >
@@ -62,7 +62,7 @@ export const MissionDayScrubber: React.FC<MissionDayScrubberProps> = ({
             onClick={() => onTimeFilterChange('24h')}
             className={`px-2.5 py-1 rounded text-xs font-mono border transition-colors ${
               timeFilter === '24h'
-                ? 'bg-telemetry-cyan text-space-950 font-bold border-telemetry-cyan'
+                ? 'bg-telemetry-cyan text-white font-bold border-telemetry-cyan'
                 : 'bg-space-900 text-space-300 border-space-700 hover:bg-space-800'
             }`}
           >
@@ -72,7 +72,7 @@ export const MissionDayScrubber: React.FC<MissionDayScrubberProps> = ({
             onClick={() => onTimeFilterChange('all')}
             className={`px-2.5 py-1 rounded text-xs font-mono border transition-colors ${
               timeFilter === 'all'
-                ? 'bg-telemetry-cyan text-space-950 font-bold border-telemetry-cyan'
+                ? 'bg-telemetry-cyan text-white font-bold border-telemetry-cyan'
                 : 'bg-space-900 text-space-300 border-space-700 hover:bg-space-800'
             }`}
           >

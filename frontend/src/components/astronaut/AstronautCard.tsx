@@ -72,7 +72,7 @@ export const AstronautCard: React.FC<AstronautCardProps> = ({
           onClick={onSelect}
           className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded font-mono text-xs transition-colors ${
             isSelected
-              ? 'bg-telemetry-cyan text-space-950 font-bold'
+              ? 'bg-telemetry-cyan text-white font-bold'
               : 'bg-space-800 hover:bg-space-750 text-space-200 border border-space-700'
           }`}
         >

@@ -145,7 +145,7 @@ export const AstronautProfileModal: React.FC<AstronautProfileModalProps> = ({
               onSelectForMonitoring(astronaut.id);
               onClose();
             }}
-            className="flex items-center gap-2 px-4 py-2 rounded bg-telemetry-cyan hover:bg-telemetry-cyan/90 font-mono text-xs font-bold text-space-950 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded bg-telemetry-cyan hover:bg-telemetry-cyan/90 font-mono text-xs font-bold text-white transition-colors"
           >
             <CheckCircle2 className="h-4 w-4" />
             <span>Select as Active Focus</span>

@@ -1,0 +1,117 @@
+{
+  "backend_startup": {
+    "status": "PASS",
+    "url": "http://127.0.0.1:8000/api/v1/health",
+    "details": "FastAPI uvicorn startup confirmed on port 8000"
+  },
+  "health_endpoint_response": {
+    "status": "healthy",
+    "app": "COSMOLOOKUP API",
+    "version": "v1",
+    "environment": "development"
+  },
+  "frontend_startup": {
+    "status": "PASS",
+    "url": "http://127.0.0.1:5173/",
+    "details": "Vite dev server running on port 5173"
+  },
+  "browser_console_errors": [],
+  "failed_network_requests": [],
+  "workflows": {
+    "wf1_dashboard_loads": {
+      "name": "1. Dashboard loads",
+      "status": "PASS",
+      "details": "Title: 'COSMOLOOKUP \u2014 Astronaut Health & Mission Telemetry', HUD: True, KPI: True, Connected Badge: True"
+    },
+    "wf2_crew_list_loads": {
+      "name": "2. Crew list loads",
+      "status": "PASS",
+      "details": "All 5 crew members identified: Sarah=True, Alex=True, Marcus=True, Elena=True, Kenji=True"
+    },
+    "wf3_astronaut_selection": {
+      "name": "3. Astronaut selection works",
+      "status": "PASS",
+      "details": "Selected Alex Chen: True, Banner updated with role & mission: True"
+    },
+    "wf4_profile_and_measurements": {
+      "name": "4. Astronaut profile and measurements load",
+      "status": "FAIL",
+      "details": "Profile modal opened with biomedical specs and telemetry: False"
+    },
+    "wf5_measurement_catalogue": {
+      "name": "5. Measurement catalogue works",
+      "status": "PASS",
+      "details": "Canonical metrics: True, Sanity bounds: True, Context taxonomy: True"
+    },
+    "wf6_baselines_and_trends": {
+      "name": "6. Baseline and trend views work",
+      "status": "FAIL",
+      "details": "Baselines (Median, IQR): True, Trends (Sen's slope per 24h, freshness): False"
+    },
+    "wf7_health_assessments": {
+      "name": "7. Health assessments load",
+      "status": "PASS",
+      "details": "Summary narrative & findings: True, Operational guidance recommendations: True"
+    },
+    "wf8_alert_dashboard": {
+      "name": "8. Alert dashboard works",
+      "status": "FAIL",
+      "details": "Alert Command Desk queue and triage controls rendered: False"
+    },
+    "wf9_symptom_reporting": {
+      "name": "9. Symptom reporting works",
+      "status": "FAIL",
+      "details": "Symptom modal opened: False, Symptom submitted: False, Clinical primacy evaluated: False"
+    },
+    "wf10_interactive_3d_anatomy": {
+      "name": "10. Interactive 3D anatomy loads and responds to interaction",
+      "status": "FAIL",
+      "details": "WebGL canvas / holographic vector canvas rendered: True, Anatomy cockpit active: False"
+    },
+    "wf11_body_system_selection": {
+      "name": "11. Body-system selection displays the correct contextual information",
+      "status": "PASS",
+      "details": "Selected Cardiovascular region: True, Contextual physiological telemetry & NASA-STD-3001 limits displayed: True"
+    },
+    "wf12_anatomy_to_osdr_navigation": {
+      "name": "12. Anatomy-to-OSDR navigation works",
+      "status": "FAIL",
+      "details": "Contextual deep-link button active: True, Navigated to Research Catalogue: False, Target physiological cohort pre-filtered: True"
+    },
+    "wf13_research_explorer_15_studies": {
+      "name": "13. Research Explorer loads all 15 curated studies",
+      "status": "PASS",
+      "details": "Displaying 15 of 15 verified: True, Interactive study card count in DOM: 15/15"
+    },
+    "wf14_research_search_and_filters": {
+      "name": "14. Research search and filters work",
+      "status": "FAIL",
+      "details": "Full-text search query 'SOMA' isolated OSD-575 inspiration4 cohort: False"
+    },
+    "wf15_study_detail_modal": {
+      "name": "15. Study detail modal opens and closes",
+      "status": "FAIL",
+      "details": "Modal opened: True, Abstract & biological parameters: False, Translational guardrails: False, Closed via Escape: True"
+    },
+    "wf16_nasa_source_links": {
+      "name": "16. NASA source links work",
+      "status": "FAIL",
+      "details": "Official NASA OSDR external link resolved: https://osdr.nasa.gov/bio/repo/data/studies/OSD-1018 (valid: False)"
+    },
+    "wf17_research_telemetry_separation": {
+      "name": "17. Research data remains separate from operational telemetry",
+      "status": "PASS",
+      "details": "Central judge disclosure verified: True, Non-mutation protocol guarantee declared: True"
+    },
+    "wf18_offline_demo_mode": {
+      "name": "18. Offline demo mode works and is clearly identified",
+      "status": "PASS",
+      "details": "Demo Mode toggled: True, Offline HUD indicator active: True, All 15 studies functional offline: True"
+    },
+    "wf19_responsive_layouts": {
+      "name": "19. Responsive layouts work at desktop, tablet and mobile sizes",
+      "status": "PASS",
+      "details": "Desktop overflow: False, Tablet overflow: False, Mobile overflow: False"
+    }
+  }
+}

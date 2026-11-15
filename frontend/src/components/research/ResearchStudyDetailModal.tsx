@@ -298,7 +298,7 @@ export const ResearchStudyDetailModal: React.FC<ResearchStudyDetailModalProps> =
                 href={study.official_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded bg-telemetry-cyan text-space-950 text-xs font-bold hover:bg-telemetry-cyan/90 transition-colors shadow-hud-glow"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded bg-telemetry-cyan text-white text-xs font-bold hover:bg-telemetry-cyan/90 transition-colors shadow-hud-glow"
               >
                 <span>View on NASA OSDR</span>
                 <ExternalLink className="h-3.5 w-3.5" />

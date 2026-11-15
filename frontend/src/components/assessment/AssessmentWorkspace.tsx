@@ -291,7 +291,7 @@ export const AssessmentWorkspace: React.FC<AssessmentWorkspaceProps> = ({
               <p>No assessment records available for this astronaut.</p>
               <button
                 onClick={() => setIsSymptomModalOpen(true)}
-                className="px-4 py-2 rounded bg-purple-500 hover:bg-purple-400 text-space-950 font-bold font-mono text-xs transition-colors"
+                className="px-4 py-2 rounded bg-purple-500 hover:bg-purple-400 text-white font-bold font-mono text-xs transition-colors"
               >
                 Synthesize First Assessment
               </button>
@@ -406,7 +406,7 @@ export const AssessmentWorkspace: React.FC<AssessmentWorkspaceProps> = ({
               </button>
               <button
                 onClick={handleSymptomSubmit}
-                className="px-4 py-1.5 rounded bg-purple-500 hover:bg-purple-400 text-xs font-mono font-bold text-space-950"
+                className="px-4 py-1.5 rounded bg-purple-500 hover:bg-purple-400 text-xs font-mono font-bold text-white"
               >
                 Synthesize Assessment
               </button>
