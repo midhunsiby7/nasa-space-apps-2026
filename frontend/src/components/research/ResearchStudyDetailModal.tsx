@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   X,
   ExternalLink,
@@ -23,14 +23,68 @@ export const ResearchStudyDetailModal: React.FC<ResearchStudyDetailModalProps> =
   onClose,
   onFilterBodySystem,
 }) => {
+  const modalContainerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggeringElementRef = useRef<HTMLElement | null>(null);
+
+  // Focus management & background interaction prevention
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    if (isOpen) {
+      // Store the element that triggered the modal
+      triggeringElementRef.current = document.activeElement as HTMLElement | null;
+
+      // Prevent background scrolling
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      // Move focus into the modal once mounted
+      const focusTimer = setTimeout(() => {
+        closeButtonRef.current?.focus();
+      }, 50);
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          onClose();
+          return;
+        }
+
+        // Focus trap inside the modal
+        if (e.key === 'Tab' && modalContainerRef.current) {
+          const focusable = modalContainerRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusable.length === 0) return;
+
+          const firstElement = focusable[0];
+          const lastElement = focusable[focusable.length - 1];
+
+          if (e.shiftKey) {
+            if (document.activeElement === firstElement || !modalContainerRef.current.contains(document.activeElement)) {
+              e.preventDefault();
+              lastElement.focus();
+            }
+          } else {
+            if (document.activeElement === lastElement || !modalContainerRef.current.contains(document.activeElement)) {
+              e.preventDefault();
+              firstElement.focus();
+            }
+          }
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        clearTimeout(focusTimer);
+        window.removeEventListener('keydown', handleKeyDown);
+        document.body.style.overflow = originalOverflow;
+        // Return focus to triggering element after closing
+        if (triggeringElementRef.current && typeof triggeringElementRef.current.focus === 'function') {
+          triggeringElementRef.current.focus();
+        }
+      };
+    }
   }, [isOpen, onClose]);
 
   if (!isOpen || !study) return null;
@@ -40,9 +94,18 @@ export const ResearchStudyDetailModal: React.FC<ResearchStudyDetailModalProps> =
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-study-title"
+      aria-describedby="modal-study-desc"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-space-950/80 backdrop-blur-sm animate-fade-in font-mono"
     >
-      <div className="rounded-xl bg-space-900 border border-space-700 max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div
+        ref={modalContainerRef}
+        className="rounded-xl bg-space-900 border border-space-700 max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
         {/* Modal Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-space-750 bg-space-850">
           <div className="flex items-start gap-3">
@@ -75,6 +138,7 @@ export const ResearchStudyDetailModal: React.FC<ResearchStudyDetailModalProps> =
           </div>
 
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             aria-label="Close study modal"
@@ -110,7 +174,10 @@ export const ResearchStudyDetailModal: React.FC<ResearchStudyDetailModalProps> =
               <FileText className="h-4 w-4 text-telemetry-cyan" />
               Scientific Abstract &amp; Study Overview
             </h3>
-            <p className="p-3.5 rounded bg-space-850 border border-space-750 text-space-200 leading-relaxed text-xs">
+            <p
+              id="modal-study-desc"
+              className="p-3.5 rounded bg-space-850 border border-space-750 text-space-200 leading-relaxed text-xs"
+            >
               {study.description}
             </p>
           </div>

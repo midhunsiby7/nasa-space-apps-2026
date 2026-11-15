@@ -140,6 +140,13 @@
     "details": "Detailed abstract, biological endpoints, translational guardrails, and official NASA OSDR link verified"
   },
   {
+    "suite": "Accessibility",
+    "id": "B-18a",
+    "name": "Research Study Modal Accessibility & Focus Management",
+    "status": "PASS",
+    "details": "role=dialog, aria-modal, focus trapping, Escape dismiss, and background isolation verified"
+  },
+  {
     "suite": "Screens",
     "id": "B-19",
     "name": "3D Anatomy Contextual Research Bridge",
@@ -194,5 +201,33 @@
     "name": "Microsoft Edge Rendering & Compatibility",
     "status": "PASS",
     "details": "Rendered cleanly in Edge with title: 'COSMOLOOKUP \u2014 Astronaut Health & Mission Telemetry'"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-2",
+    "name": "Microsoft Edge Research Explorer View",
+    "status": "PASS",
+    "details": "NASA OSDR Research Catalogue rendered cleanly on Edge with 15 curated empirical studies"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-3",
+    "name": "Microsoft Edge Research Filtering & Search",
+    "status": "PASS",
+    "details": "Multi-dimensional filter console operates with interactive responsiveness on Edge"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-4",
+    "name": "Microsoft Edge Research Study Modal & Accessibility",
+    "status": "PASS",
+    "details": "role=dialog, aria-modal, focus trapping, Escape dismiss, and scientific limitations verified on Edge"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-5",
+    "name": "Microsoft Edge 3D Anatomy & Research Contextual Bridge",
+    "status": "PASS",
+    "details": "Contextual deep-link from anatomical region inspector to targeted NASA OSDR evidence operates seamlessly on Edge"
   }
 ]

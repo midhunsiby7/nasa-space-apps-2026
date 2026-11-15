@@ -31,6 +31,7 @@ export const ResearchExplorerView: React.FC<ResearchExplorerViewProps> = ({
   const [summary, setSummary] = useState<ResearchSummaryResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [connectionState, setConnectionState] = useState<string>(apiClient.getConnectionState());
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -40,6 +41,14 @@ export const ResearchExplorerView: React.FC<ResearchExplorerViewProps> = ({
 
   // Detail Modal State
   const [inspectingStudy, setInspectingStudy] = useState<ResearchStudy | null>(null);
+
+  // Subscribe to connection state changes
+  useEffect(() => {
+    const unsubscribe = apiClient.subscribeConnectionState((state) => {
+      setConnectionState(state);
+    });
+    return unsubscribe;
+  }, []);
 
   // Sync initial body system if passed from 3D anatomy or external view
   useEffect(() => {
@@ -104,13 +113,27 @@ export const ResearchExplorerView: React.FC<ResearchExplorerViewProps> = ({
               <BookOpen className="h-6 w-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-mono text-base font-bold uppercase tracking-wider text-space-100">
                   NASA OSDR Research Catalogue &amp; Evidence Repository
                 </h2>
-                <span className="rounded bg-sky-500/15 px-2 py-0.5 font-mono text-[10px] text-sky-400 border border-sky-500/30">
-                  OFFLINE-FIRST
-                </span>
+                {connectionState === 'offline_demo' ? (
+                  <span
+                    className="rounded bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] text-amber-300 border border-amber-500/30 flex items-center gap-1"
+                    title="Operating with offline verified NASA OSDR demo catalogue"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span>OFFLINE DEMO REPOSITORY</span>
+                  </span>
+                ) : (
+                  <span
+                    className="rounded bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
+                    title="Live connected to FastAPI NASA OSDR research endpoints"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                    <span>LIVE OSDR API</span>
+                  </span>
+                )}
               </div>
               <p className="font-mono text-xs text-space-300 mt-1 leading-relaxed max-w-4xl">
                 {"COSMOLOOKUP doesn't just display astronaut health indicators. It also provides access to the scientific research behind spaceflight health risks, while keeping research evidence separate from individual astronaut telemetry."}
