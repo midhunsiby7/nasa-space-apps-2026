@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Activity,
   Layers,
@@ -11,6 +11,12 @@ import {
   Wind,
   Sparkles,
   Zap,
+  Maximize2,
+  Minimize2,
+  Compass,
+  Sliders,
+  ShieldAlert,
+  X,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement, MeasurementType } from '../../types/measurement';
@@ -19,11 +25,13 @@ import { TrendObservation } from '../../types/trend';
 import { AlertResponse } from '../../types/alert';
 import { AssessmentResponse } from '../../types/assessment';
 import {
-  AnatomicalRegionId,
-  ANATOMICAL_REGIONS,
-  ANATOMICAL_REGION_LIST,
+  AnatomicalStructureId,
+  AnatomicalSystemId,
+  ANATOMICAL_STRUCTURES,
+  ANATOMICAL_STRUCTURE_LIST,
+  ANATOMICAL_SYSTEM_LIST,
 } from './anatomyRegistry';
-import { AnatomyScene } from './AnatomyScene';
+import { AnatomyScene, CameraViewAngle } from './AnatomyScene';
 import { RegionTelemetryInspector } from './RegionTelemetryInspector';
 import { NonAnatomicalDataDrawer } from './NonAnatomicalDataDrawer';
 
@@ -54,58 +62,189 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
   onNavigateToBaselines,
   onNavigateToCatalog,
 }) => {
-  const [selectedRegion, setSelectedRegion] = useState<AnatomicalRegionId>('cardiovascular');
-  const [hoveredRegion, setHoveredRegion] = useState<AnatomicalRegionId | null>(null);
+  const [selectedStructure, setSelectedStructure] = useState<AnatomicalStructureId | null>('heart');
+  const [hoveredStructure, setHoveredStructure] = useState<AnatomicalStructureId | null>(null);
   const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
   const [isWireframe, setIsWireframe] = useState<boolean>(false);
   const [resetTrigger, setResetTrigger] = useState<number>(0);
+  const [viewAngle, setViewAngle] = useState<CameraViewAngle>(null);
   const [isNonAnatomicalOpen, setIsNonAnatomicalOpen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isIsolated, setIsIsolated] = useState<boolean>(false);
+  const [shellOpacity, setShellOpacity] = useState<number>(0.16);
+  const [isOrganTreeOpen, setIsOrganTreeOpen] = useState<boolean>(false);
 
-  const activeRegionConfig = ANATOMICAL_REGIONS[selectedRegion];
+  // System visibility state (all enabled by default)
+  const [visibleSystems, setVisibleSystems] = useState<Record<AnatomicalSystemId, boolean>>({
+    cardiovascular: true,
+    respiratory: true,
+    nervous: true,
+    digestive: true,
+    urinary: true,
+    muscular: true,
+    skeletal: true,
+    integumentary: true,
+  });
 
-  // Helper to map region icons
-  const getRegionIcon = (id: AnatomicalRegionId) => {
+  const viewportContainerRef = useRef<HTMLDivElement>(null);
+
+  // Active structure configuration
+  const activeStructureConfig = selectedStructure
+    ? ANATOMICAL_STRUCTURES[selectedStructure] || ANATOMICAL_STRUCTURES['heart']
+    : ANATOMICAL_STRUCTURES['heart'];
+
+  // Fullscreen API toggle with fallback
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement && viewportContainerRef.current) {
+      if (viewportContainerRef.current.requestFullscreen) {
+        viewportContainerRef.current
+          .requestFullscreen()
+          .then(() => setIsFullscreen(true))
+          .catch(() => setIsFullscreen((prev) => !prev));
+      } else {
+        setIsFullscreen((prev) => !prev);
+      }
+    } else if (document.fullscreenElement) {
+      if (document.exitFullscreen) {
+        document
+          .exitFullscreen()
+          .then(() => setIsFullscreen(false))
+          .catch(() => setIsFullscreen(false));
+      } else {
+        setIsFullscreen(false);
+      }
+    } else {
+      setIsFullscreen((prev) => !prev);
+    }
+  }, []);
+
+  // Listen for native browser fullscreen changes and keyboard shortcuts
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+        setIsFullscreen(false);
+      } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && e.target === document.body) {
+        toggleFullscreen();
+      } else if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && e.target === document.body) {
+        handleCameraAngle('reset');
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullscreen, toggleFullscreen]);
+
+  // System visibility helpers
+  const toggleSystemVisibility = (sysId: AnatomicalSystemId) => {
+    setVisibleSystems((prev) => ({
+      ...prev,
+      [sysId]: !prev[sysId],
+    }));
+  };
+
+  const showAllSystems = () => {
+    setVisibleSystems({
+      cardiovascular: true,
+      respiratory: true,
+      nervous: true,
+      digestive: true,
+      urinary: true,
+      muscular: true,
+      skeletal: true,
+      integumentary: true,
+    });
+    setIsIsolated(false);
+  };
+
+  const isolateSystem = (sysId: AnatomicalSystemId) => {
+    const next: Record<AnatomicalSystemId, boolean> = {
+      cardiovascular: false,
+      respiratory: false,
+      nervous: false,
+      digestive: false,
+      urinary: false,
+      muscular: false,
+      skeletal: false,
+      integumentary: false,
+    };
+    next[sysId] = true;
+    setVisibleSystems(next);
+  };
+
+  const handleCameraAngle = (angle: CameraViewAngle) => {
+    setViewAngle(angle);
+    setResetTrigger((prev) => prev + 1);
+  };
+
+  const getSystemIcon = (id: AnatomicalSystemId) => {
     switch (id) {
       case 'cardiovascular':
         return <Heart className="h-3.5 w-3.5" />;
       case 'respiratory':
         return <Wind className="h-3.5 w-3.5" />;
-      case 'thermoregulation':
-        return <Thermometer className="h-3.5 w-3.5" />;
-      case 'ocular':
-        return <Eye className="h-3.5 w-3.5" />;
-      case 'neurological':
+      case 'nervous':
         return <Sparkles className="h-3.5 w-3.5" />;
-      case 'musculoskeletal':
+      case 'digestive':
+        return <Thermometer className="h-3.5 w-3.5" />;
+      case 'urinary':
+        return <ShieldAlert className="h-3.5 w-3.5" />;
+      case 'muscular':
+        return <Zap className="h-3.5 w-3.5" />;
+      case 'skeletal':
         return <Layers className="h-3.5 w-3.5" />;
+      case 'integumentary':
+        return <Eye className="h-3.5 w-3.5" />;
       default:
         return <Activity className="h-3.5 w-3.5" />;
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div
+      ref={viewportContainerRef}
+      className={`relative transition-all duration-300 ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 bg-[#070d19] w-screen h-screen flex flex-col p-3 overflow-hidden'
+          : 'space-y-4'
+      }`}
+    >
       {/* Viewport Control Bar */}
-      <div className="rounded-lg border border-space-700 bg-space-850 p-3.5 shadow-hud-card">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="rounded-lg border border-space-700 bg-space-850 p-3 shadow-hud-card">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Activity className="h-4 w-4 text-telemetry-cyan" />
               <h3 className="font-mono text-sm font-bold uppercase tracking-wider text-space-100">
-                Interactive Anatomical Telemetry Navigator
+                COSMOLOOKUP 3D Human Anatomy Atlas
               </h3>
               <span className="rounded bg-telemetry-cyan/15 px-2 py-0.5 font-mono text-[10px] text-telemetry-cyan border border-telemetry-cyan/30">
-                {viewMode === '3d' ? '3D HOLOGRAPHIC MESH' : '2D SCHEMATIC'}
+                {viewMode === '3d' ? '3D PBR ANATOMICAL MESH' : '2D SCHEMATIC'}
               </span>
+              {astronaut && (
+                <span className="rounded bg-space-800 px-2 py-0.5 font-mono text-[10px] text-space-300 border border-space-700">
+                  Crew: <strong className="text-space-100">{astronaut.name}</strong> ({astronaut.id})
+                </span>
+              )}
             </div>
             <p className="font-mono text-xs text-space-400 mt-1">
-              Select anatomical zones to inspect telemetry sensors, baseline operational envelopes, and trend trajectories.
+              Select internal organs, skeletal framework, or vascular trees to inspect live physiological telemetry, baselines, and flight countermeasures.
             </p>
           </div>
 
           {/* Action Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* View Mode Toggle (3D vs 2D) */}
+            {/* View Mode Toggle */}
             <button
               onClick={() => setViewMode((prev) => (prev === '3d' ? '2d' : '3d'))}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 text-xs font-mono text-space-200 transition-colors"
@@ -115,11 +254,25 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
               <span>{viewMode === '3d' ? 'Switch to 2D' : 'Switch to 3D'}</span>
             </button>
 
-            {/* Wireframe Toggle (only in 3D mode) */}
+            {/* Organ Index Tree Button */}
+            <button
+              onClick={() => setIsOrganTreeOpen((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-mono transition-colors ${
+                isOrganTreeOpen
+                  ? 'bg-telemetry-cyan/20 border-telemetry-cyan text-telemetry-cyan font-bold'
+                  : 'bg-space-800 hover:bg-space-750 border-space-700 text-space-300'
+              }`}
+              title="Open accessible anatomical structures index"
+            >
+              <Sliders className="h-3.5 w-3.5" />
+              <span>Anatomy Index</span>
+            </button>
+
+            {/* Wireframe Toggle (in 3D mode) */}
             {viewMode === '3d' && (
               <button
                 onClick={() => setIsWireframe((prev) => !prev)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-mono transition-colors ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-mono transition-colors ${
                   isWireframe
                     ? 'bg-telemetry-cyan/20 border-telemetry-cyan text-telemetry-cyan font-bold'
                     : 'bg-space-800 hover:bg-space-750 border-space-700 text-space-300'
@@ -127,114 +280,302 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
                 title="Toggle mesh wireframe visualization"
               >
                 <Zap className="h-3.5 w-3.5" />
-                <span>{isWireframe ? 'Wireframe: ON' : 'Wireframe: OFF'}</span>
+                <span>{isWireframe ? 'Wireframe: ON' : 'Wireframe'}</span>
+              </button>
+            )}
+
+            {/* Isolate Selected Organ Toggle */}
+            {viewMode === '3d' && (
+              <button
+                onClick={() => setIsIsolated((prev) => !prev)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-mono transition-colors ${
+                  isIsolated
+                    ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                    : 'bg-space-800 hover:bg-space-750 border-space-700 text-space-300'
+                }`}
+                title="Isolate selected organ and ghost non-selected structures"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>{isIsolated ? 'Isolated' : 'Isolate'}</span>
               </button>
             )}
 
             {/* Reset Camera View */}
             {viewMode === '3d' && (
               <button
-                onClick={() => setResetTrigger((prev) => prev + 1)}
+                onClick={() => handleCameraAngle('reset')}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 text-xs font-mono text-space-300 hover:text-space-100"
-                title="Reset Camera Orientation"
+                title="Reset Camera Orientation [R]"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>Reset View</span>
               </button>
             )}
 
-            {/* Open Non-Anatomical Data Drawer */}
+            {/* Prominent FULLSCREEN Button */}
+            <button
+              onClick={toggleFullscreen}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-mono font-bold transition-all ${
+                isFullscreen
+                  ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                  : 'bg-telemetry-cyan/20 hover:bg-telemetry-cyan/30 border-telemetry-cyan/50 text-telemetry-cyan'
+              }`}
+              title="Toggle Fullscreen Anatomy Inspection [F]"
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5" />
+                  <span>Exit Fullscreen</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  <span>Fullscreen View</span>
+                </>
+              )}
+            </button>
+
+            {/* Non-Anatomical Channels */}
             <button
               onClick={() => setIsNonAnatomicalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-purple-900/30 hover:bg-purple-900/50 border border-purple-500/40 text-xs font-mono text-purple-200 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-purple-900/30 hover:bg-purple-900/50 border border-purple-500/40 text-xs font-mono text-purple-200 transition-colors"
               title="View non-anatomical channels (Radiation, ECLSS, Sleep)"
             >
               <Radio className="h-3.5 w-3.5 text-purple-400" />
-              <span>Non-Anatomical Channels</span>
+              <span>Habitat Channels</span>
             </button>
           </div>
         </div>
 
-        {/* Region Fast Selection Pills */}
-        <div className="mt-3 pt-3 border-t border-space-800 flex flex-wrap gap-1.5">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-space-400 self-center mr-1">
-            Focus Zone:
-          </span>
-          {ANATOMICAL_REGION_LIST.map((reg) => {
-            const isSelected = selectedRegion === reg.id;
-            return (
+        {/* 360-Degree Camera Angle Presets Toolbar */}
+        {viewMode === '3d' && (
+          <div className="mt-3 pt-2.5 border-t border-space-800 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-space-400 mr-1 flex items-center gap-1">
+                <Compass className="h-3 w-3 text-telemetry-cyan" />
+                360° Angles:
+              </span>
               <button
-                key={reg.id}
-                onClick={() => setSelectedRegion(reg.id)}
-                onMouseEnter={() => setHoveredRegion(reg.id)}
-                onMouseLeave={() => setHoveredRegion(null)}
-                className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-mono text-xs transition-colors ${
-                  isSelected
-                    ? 'bg-space-700 text-space-100 font-bold border'
-                    : 'bg-space-900/70 text-space-400 hover:bg-space-800 hover:text-space-200 border border-space-800'
-                }`}
-                style={{
-                  borderColor: isSelected ? reg.color : undefined,
-                }}
+                onClick={() => handleCameraAngle('front')}
+                className="rounded px-2.5 py-1 font-mono text-xs bg-space-800 hover:bg-space-700 text-space-200 border border-space-700 hover:border-telemetry-cyan/50"
               >
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: reg.color }}
-                />
-                {getRegionIcon(reg.id)}
-                <span>{reg.label.split(' ')[0]}</span>
+                Front View
               </button>
+              <button
+                onClick={() => handleCameraAngle('back')}
+                className="rounded px-2.5 py-1 font-mono text-xs bg-space-800 hover:bg-space-700 text-space-200 border border-space-700 hover:border-telemetry-cyan/50"
+              >
+                Back View
+              </button>
+              <button
+                onClick={() => handleCameraAngle('left')}
+                className="rounded px-2.5 py-1 font-mono text-xs bg-space-800 hover:bg-space-700 text-space-200 border border-space-700 hover:border-telemetry-cyan/50"
+              >
+                Left Side
+              </button>
+              <button
+                onClick={() => handleCameraAngle('right')}
+                className="rounded px-2.5 py-1 font-mono text-xs bg-space-800 hover:bg-space-700 text-space-200 border border-space-700 hover:border-telemetry-cyan/50"
+              >
+                Right Side
+              </button>
+            </div>
+
+            {/* Shell Opacity Controller */}
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-space-400">Skin Contour:</span>
+              <button
+                onClick={() => setShellOpacity((prev) => (prev > 0 ? 0.0 : 0.16))}
+                className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                  shellOpacity > 0
+                    ? 'bg-space-800 border-space-700 text-space-300'
+                    : 'bg-space-900 border-space-800 text-space-500'
+                }`}
+              >
+                {shellOpacity > 0 ? 'Visible' : 'Hidden'}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="0.5"
+                step="0.05"
+                value={shellOpacity}
+                onChange={(e) => setShellOpacity(parseFloat(e.target.value))}
+                className="w-16 accent-telemetry-cyan cursor-pointer"
+                title={`Outer Shell Opacity: ${Math.round(shellOpacity * 100)}%`}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Anatomical Systems Exploration Bar */}
+        <div className="mt-2.5 pt-2 border-t border-space-800 flex flex-wrap items-center gap-1.5">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-space-400 mr-1 flex items-center gap-1">
+            <Layers className="h-3 w-3 text-space-400" />
+            Systems:
+          </span>
+          {ANATOMICAL_SYSTEM_LIST.map((sys) => {
+            const isVisible = visibleSystems[sys.id] !== false;
+            return (
+              <div key={sys.id} className="inline-flex rounded border border-space-800 overflow-hidden">
+                <button
+                  onClick={() => toggleSystemVisibility(sys.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 font-mono text-xs transition-colors ${
+                    isVisible
+                      ? 'bg-space-800 text-space-100'
+                      : 'bg-space-900/50 text-space-500 opacity-60'
+                  }`}
+                  style={{
+                    borderLeft: isVisible ? `2px solid ${sys.color}` : '2px solid transparent',
+                  }}
+                  title={`Toggle ${sys.label} visibility`}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: isVisible ? sys.color : '#475569' }}
+                  />
+                  {getSystemIcon(sys.id)}
+                  <span>{sys.label.split(' ')[0]}</span>
+                </button>
+                <button
+                  onClick={() => isolateSystem(sys.id)}
+                  className="px-1.5 py-1 font-mono text-[9px] bg-space-850 hover:bg-space-750 text-space-400 hover:text-telemetry-cyan border-l border-space-800"
+                  title={`Isolate ${sys.label} (hide all other systems)`}
+                >
+                  Solo
+                </button>
+              </div>
             );
           })}
+          <button
+            onClick={showAllSystems}
+            className="rounded px-2 py-1 font-mono text-[10px] text-telemetry-cyan hover:bg-space-800 border border-telemetry-cyan/30 ml-auto"
+          >
+            Show All
+          </button>
         </div>
       </div>
 
-      {/* Main Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[580px]">
-        {/* Left Column: 3D Holographic Scene or 2D Schematic */}
-        <div className="lg:col-span-7 flex flex-col rounded-lg border border-space-700 bg-space-900 shadow-hud-card overflow-hidden min-h-[500px]">
+      {/* Accessible Organ Selector Drawer / Panel */}
+      {isOrganTreeOpen && (
+        <div className="rounded-lg border border-telemetry-cyan/30 bg-space-900 p-4 shadow-hud-card">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-space-800">
+            <div className="flex items-center gap-2">
+              <Sliders className="h-4 w-4 text-telemetry-cyan" />
+              <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-space-200">
+                Non-3D Accessible Anatomical Structure Index
+              </h4>
+            </div>
+            <button
+              onClick={() => setIsOrganTreeOpen(false)}
+              className="rounded p-1 text-space-400 hover:text-space-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            {ANATOMICAL_STRUCTURE_LIST.map((struct) => {
+              const isSelected = selectedStructure === struct.id;
+              return (
+                <button
+                  key={struct.id}
+                  onClick={() => {
+                    setSelectedStructure(struct.id);
+                    setIsOrganTreeOpen(false);
+                  }}
+                  className={`flex flex-col items-start p-2.5 rounded border text-left font-mono transition-all ${
+                    isSelected
+                      ? 'bg-space-800 border-telemetry-cyan text-space-100 shadow-md'
+                      : 'bg-space-850 hover:bg-space-800 border-space-700 text-space-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 w-full">
+                    <span
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ backgroundColor: struct.color }}
+                    />
+                    <span className="text-xs font-bold truncate">{struct.label}</span>
+                  </div>
+                  <span className="text-[10px] text-space-400 mt-1 truncate">
+                    {struct.systemLabel}
+                  </span>
+                  <span
+                    className={`mt-1.5 text-[9px] px-1 rounded ${
+                      struct.isContinuousTelemetryAvailable
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-amber-500/10 text-amber-300'
+                    }`}
+                  >
+                    {struct.isContinuousTelemetryAvailable ? 'Streaming Active' : 'Periodic'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Main Layout (Split between 3D Canvas and Contextual Inspector) */}
+      <div
+        className={`grid gap-4 ${
+          isFullscreen
+            ? 'flex-1 grid-cols-1 lg:grid-cols-12 min-h-0 h-full overflow-hidden'
+            : 'grid-cols-1 lg:grid-cols-12 min-h-[620px]'
+        }`}
+      >
+        {/* Left / Central Column: 3D Scene or 2D Schematic */}
+        <div
+          className={`flex flex-col rounded-lg border border-space-700 bg-space-900 shadow-hud-card overflow-hidden ${
+            isFullscreen ? 'lg:col-span-8 h-full' : 'lg:col-span-7 min-h-[520px]'
+          }`}
+        >
           {/* Viewport Top Status Banner */}
           <div className="flex items-center justify-between border-b border-space-800 bg-space-850 px-3.5 py-2">
             <div className="flex items-center gap-2">
               <span
                 className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: activeRegionConfig.color }}
+                style={{ backgroundColor: activeStructureConfig.color }}
               />
               <span className="font-mono text-xs font-bold text-space-200 uppercase tracking-wider">
-                {activeRegionConfig.label}
+                {activeStructureConfig.label}
               </span>
               <span className="font-mono text-[10px] text-space-400">
-                ({activeRegionConfig.system})
+                ({activeStructureConfig.systemLabel})
               </span>
             </div>
 
             <div className="font-mono text-[10px] text-space-400 hidden sm:block">
               {viewMode === '3d'
-                ? 'Left Drag: Orbit • Scroll: Zoom • Right Drag: Pan'
-                : 'Interactive 2D Telemetry Mannequin'}
+                ? 'Left Drag: Orbit 360° • Scroll: Zoom • Right Drag: Pan • Click Mesh: Inspect'
+                : 'Interactive 2D Telemetry Schematic'}
             </div>
           </div>
 
-          {/* Interactive Rendering Canvas */}
-          <div className="relative flex-1 min-h-[460px] w-full">
+          {/* Rendering Canvas Container */}
+          <div className="relative flex-1 w-full h-full min-h-[480px]">
             {viewMode === '3d' ? (
               <AnatomyScene
-                selectedRegion={selectedRegion}
-                onSelectRegion={setSelectedRegion}
-                hoveredRegion={hoveredRegion}
-                onHoverRegion={setHoveredRegion}
+                selectedStructure={selectedStructure}
+                onSelectStructure={setSelectedStructure}
+                hoveredStructure={hoveredStructure}
+                onHoverStructure={setHoveredStructure}
+                visibleSystems={visibleSystems}
                 isWireframe={isWireframe}
+                shellOpacity={shellOpacity}
+                isIsolated={isIsolated}
+                viewAngle={viewAngle}
+                onViewAngleApplied={() => setViewAngle(null)}
                 onFallbackTo2D={() => setViewMode('2d')}
                 resetTrigger={resetTrigger}
               />
             ) : (
-              /* 2D Schematic Fallback Mannequin */
-              <div className="flex h-full w-full flex-col items-center justify-center p-4 bg-gradient-to-b from-space-950 via-space-900 to-space-950">
+              /* 2D Schematic Fallback */
+              <div className="flex h-full w-full flex-col items-center justify-center p-4 bg-gradient-to-b from-[#070d19] via-[#0b1424] to-[#050a14]">
                 <svg
                   viewBox="0 0 400 500"
                   className="h-full max-h-[440px] w-auto drop-shadow-lg select-none"
                 >
-                  {/* Outer Silhouette Guide */}
                   <path
                     d="M 200 40 Q 230 40 230 70 Q 230 100 215 110 L 255 130 L 285 240 L 270 245 L 245 155 L 235 240 L 245 360 L 230 470 L 210 470 L 215 280 L 200 280 L 185 280 L 190 470 L 170 470 L 155 360 L 165 240 L 155 155 L 130 245 L 115 240 L 145 130 L 185 110 Q 170 100 170 70 Q 170 40 200 40 Z"
                     fill="none"
@@ -242,147 +583,95 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
                     strokeWidth="2"
                     strokeDasharray="4 4"
                   />
-
-                  {/* 1. Cranium / Neurological Region */}
+                  {/* Cranium / Brain */}
                   <g
-                    className="cursor-pointer transition-all duration-200"
-                    onClick={() => setSelectedRegion('neurological')}
-                    onMouseEnter={() => setHoveredRegion('neurological')}
-                    onMouseLeave={() => setHoveredRegion(null)}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedStructure('brain_spinal_cord')}
                   >
                     <ellipse
                       cx="200"
                       cy="75"
                       rx="30"
                       ry="35"
-                      fill={selectedRegion === 'neurological' ? '#06b6d4' : '#083344'}
-                      fillOpacity={selectedRegion === 'neurological' ? 0.75 : hoveredRegion === 'neurological' ? 0.5 : 0.25}
+                      fill={selectedStructure === 'brain_spinal_cord' ? '#06b6d4' : '#1e293b'}
                       stroke="#06b6d4"
-                      strokeWidth={selectedRegion === 'neurological' ? 3 : 1.5}
+                      strokeWidth="1.5"
                     />
-                    <text x="200" y="80" textAnchor="middle" fill="#e0f2fe" fontSize="10" fontFamily="monospace">
+                    <text x="200" y="78" textAnchor="middle" fill="#f8fafc" fontSize="9" fontFamily="monospace">
                       BRAIN
                     </text>
                   </g>
-
-                  {/* 2. Bilateral Ocular Region */}
+                  {/* Heart */}
                   <g
-                    className="cursor-pointer transition-all duration-200"
-                    onClick={() => setSelectedRegion('ocular')}
-                    onMouseEnter={() => setHoveredRegion('ocular')}
-                    onMouseLeave={() => setHoveredRegion(null)}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedStructure('heart')}
                   >
                     <circle
-                      cx="190"
-                      cy="70"
-                      r="6"
-                      fill={selectedRegion === 'ocular' ? '#38bdf8' : '#075985'}
-                      fillOpacity={selectedRegion === 'ocular' ? 0.9 : 0.4}
-                      stroke="#38bdf8"
-                      strokeWidth={selectedRegion === 'ocular' ? 2 : 1}
-                    />
-                    <circle
-                      cx="210"
-                      cy="70"
-                      r="6"
-                      fill={selectedRegion === 'ocular' ? '#38bdf8' : '#075985'}
-                      fillOpacity={selectedRegion === 'ocular' ? 0.9 : 0.4}
-                      stroke="#38bdf8"
-                      strokeWidth={selectedRegion === 'ocular' ? 2 : 1}
-                    />
-                  </g>
-
-                  {/* 3. Pulmonary / Respiratory Region (Lungs) */}
-                  <g
-                    className="cursor-pointer transition-all duration-200"
-                    onClick={() => setSelectedRegion('respiratory')}
-                    onMouseEnter={() => setHoveredRegion('respiratory')}
-                    onMouseLeave={() => setHoveredRegion(null)}
-                  >
-                    <path
-                      d="M 172 135 C 160 145 155 175 172 195 C 185 195 190 175 190 145 Z"
-                      fill={selectedRegion === 'respiratory' ? '#10b981' : '#064e3b'}
-                      fillOpacity={selectedRegion === 'respiratory' ? 0.75 : hoveredRegion === 'respiratory' ? 0.5 : 0.25}
-                      stroke="#10b981"
-                      strokeWidth={selectedRegion === 'respiratory' ? 2.5 : 1}
-                    />
-                    <path
-                      d="M 228 135 C 240 145 245 175 228 195 C 215 195 210 175 210 145 Z"
-                      fill={selectedRegion === 'respiratory' ? '#10b981' : '#064e3b'}
-                      fillOpacity={selectedRegion === 'respiratory' ? 0.75 : hoveredRegion === 'respiratory' ? 0.5 : 0.25}
-                      stroke="#10b981"
-                      strokeWidth={selectedRegion === 'respiratory' ? 2.5 : 1}
-                    />
-                    <text x="200" y="142" textAnchor="middle" fill="#a7f3d0" fontSize="9" fontFamily="monospace">
-                      PULMONARY
-                    </text>
-                  </g>
-
-                  {/* 4. Cardiovascular Region (Heart & Aortic Root) */}
-                  <g
-                    className="cursor-pointer transition-all duration-200"
-                    onClick={() => setSelectedRegion('cardiovascular')}
-                    onMouseEnter={() => setHoveredRegion('cardiovascular')}
-                    onMouseLeave={() => setHoveredRegion(null)}
-                  >
-                    <path
-                      d="M 195 155 C 190 145 180 150 185 165 C 190 175 200 185 200 185 C 200 185 210 175 215 165 C 220 150 210 145 205 155 C 200 160 200 160 195 155 Z"
-                      fill={selectedRegion === 'cardiovascular' ? '#f43f5e' : '#881337'}
-                      fillOpacity={selectedRegion === 'cardiovascular' ? 0.85 : hoveredRegion === 'cardiovascular' ? 0.6 : 0.35}
+                      cx="195"
+                      cy="175"
+                      r="16"
+                      fill={selectedStructure === 'heart' ? '#dc2626' : '#991b1b'}
                       stroke="#f43f5e"
-                      strokeWidth={selectedRegion === 'cardiovascular' ? 3 : 1.5}
+                      strokeWidth="2"
                     />
-                    <text x="200" y="172" textAnchor="middle" fill="#ffe4e6" fontSize="9" fontFamily="monospace">
-                      CARDIAC
+                    <text x="195" y="179" textAnchor="middle" fill="#ffffff" fontSize="8" fontFamily="monospace">
+                      HEART
                     </text>
                   </g>
-
-                  {/* 5. Core Thermoregulation Region (Viscera / GI) */}
+                  {/* Lungs */}
                   <g
-                    className="cursor-pointer transition-all duration-200"
-                    onClick={() => setSelectedRegion('thermoregulation')}
-                    onMouseEnter={() => setHoveredRegion('thermoregulation')}
-                    onMouseLeave={() => setHoveredRegion(null)}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedStructure('lungs')}
                   >
-                    <rect
-                      x="175"
-                      y="200"
-                      width="50"
-                      height="40"
-                      rx="8"
-                      fill={selectedRegion === 'thermoregulation' ? '#f59e0b' : '#78350f'}
-                      fillOpacity={selectedRegion === 'thermoregulation' ? 0.75 : hoveredRegion === 'thermoregulation' ? 0.5 : 0.25}
+                    <ellipse
+                      cx="165"
+                      cy="175"
+                      rx="14"
+                      ry="24"
+                      fill={selectedStructure === 'lungs' ? '#10b981' : '#064e3b'}
+                      stroke="#10b981"
+                      strokeWidth="1.5"
+                    />
+                    <ellipse
+                      cx="230"
+                      cy="175"
+                      rx="14"
+                      ry="24"
+                      fill={selectedStructure === 'lungs' ? '#10b981' : '#064e3b'}
+                      stroke="#10b981"
+                      strokeWidth="1.5"
+                    />
+                    <text x="165" y="178" textAnchor="middle" fill="#ffffff" fontSize="8" fontFamily="monospace">
+                      LUNG
+                    </text>
+                    <text x="230" y="178" textAnchor="middle" fill="#ffffff" fontSize="8" fontFamily="monospace">
+                      LUNG
+                    </text>
+                  </g>
+                  {/* Liver */}
+                  <g
+                    className="cursor-pointer"
+                    onClick={() => setSelectedStructure('liver')}
+                  >
+                    <ellipse
+                      cx="180"
+                      cy="215"
+                      rx="20"
+                      ry="12"
+                      fill={selectedStructure === 'liver' ? '#f59e0b' : '#78350f'}
                       stroke="#f59e0b"
-                      strokeWidth={selectedRegion === 'thermoregulation' ? 2.5 : 1}
+                      strokeWidth="1.5"
                     />
-                    <text x="200" y="224" textAnchor="middle" fill="#fef3c7" fontSize="9" fontFamily="monospace">
-                      CORE TEMP
+                    <text x="180" y="218" textAnchor="middle" fill="#ffffff" fontSize="8" fontFamily="monospace">
+                      LIVER
                     </text>
                   </g>
-
-                  {/* 6. Musculoskeletal Framework (Spine & Limbs) */}
+                  {/* Skeleton */}
                   <g
-                    className="cursor-pointer transition-all duration-200"
-                    onClick={() => setSelectedRegion('musculoskeletal')}
-                    onMouseEnter={() => setHoveredRegion('musculoskeletal')}
-                    onMouseLeave={() => setHoveredRegion(null)}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedStructure('skeleton')}
                   >
-                    {/* Spine Column */}
-                    <line
-                      x1="200"
-                      y1="110"
-                      x2="200"
-                      y2="245"
-                      stroke={selectedRegion === 'musculoskeletal' ? '#c084fc' : '#581c87'}
-                      strokeWidth={selectedRegion === 'musculoskeletal' ? 4 : 2}
-                      strokeDasharray="3 3"
-                    />
-                    {/* Extremities Outline */}
-                    <path
-                      d="M 145 130 L 120 240 M 255 130 L 280 240 M 180 250 L 175 460 M 220 250 L 225 460"
-                      stroke={selectedRegion === 'musculoskeletal' ? '#c084fc' : '#581c87'}
-                      strokeWidth={selectedRegion === 'musculoskeletal' ? 3 : 1.5}
-                    />
+                    <line x1="200" y1="110" x2="200" y2="280" stroke="#a855f7" strokeWidth="3" />
                     <text x="200" y="270" textAnchor="middle" fill="#f3e8ff" fontSize="9" fontFamily="monospace">
                       SKELETAL
                     </text>
@@ -394,28 +683,27 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
               </div>
             )}
 
-            {/* In-Canvas HUD Overlay Info & Scientific Guardrail */}
-            <div className="pointer-events-none absolute bottom-3 left-3 max-w-sm rounded bg-space-950/90 backdrop-blur border border-space-700/70 p-2 font-mono text-[10px] text-space-300 space-y-1">
+            {/* In-Canvas HUD Overlay Info */}
+            <div className="pointer-events-none absolute bottom-3 left-3 max-w-sm rounded bg-space-950/90 backdrop-blur border border-space-700/70 p-2.5 font-mono text-[10px] text-space-300 space-y-1">
               <div>
-                <span className="text-telemetry-cyan font-bold">Active Sector:</span>{' '}
-                <span className="text-space-100">{activeRegionConfig.label}</span>
+                <span className="text-telemetry-cyan font-bold">Selected Structure:</span>{' '}
+                <span className="text-space-100 font-bold">{activeStructureConfig.label}</span>
               </div>
               <p className="text-[9px] text-space-400 leading-tight">
-                Illustrative spatial navigation model — not an anatomically accurate CAD model or clinical pathology diagnostic representation.
+                Scientific Reference: Illustrative 3D visualization. Not a patient-specific CAD model or clinical pathology diagnosis.
               </p>
-              {viewMode === '3d' && (
-                <p className="text-[9px] text-space-500 leading-tight italic">
-                  Visualizer notice: Heart pulsation (~72 bpm) and lung respiration (~14 bpm) are reference pacing animations, not live astronaut telemetry waveforms.
-                </p>
-              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column: Region Telemetry & Clinical Intelligence Inspector */}
-        <div className="lg:col-span-5 h-[580px]">
+        {/* Right Column: Anatomical Information & Telemetry Inspector */}
+        <div
+          className={`flex flex-col ${
+            isFullscreen ? 'lg:col-span-4 h-full min-h-0' : 'lg:col-span-5 h-[620px]'
+          }`}
+        >
           <RegionTelemetryInspector
-            regionId={selectedRegion}
+            structureId={selectedStructure}
             astronaut={astronaut}
             measurements={measurements}
             baselines={baselines}
@@ -430,6 +718,7 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
             }}
             onNavigateToBaselines={onNavigateToBaselines}
             onNavigateToCatalog={onNavigateToCatalog}
+            onDeselect={() => setSelectedStructure(null)}
           />
         </div>
       </div>
@@ -450,4 +739,5 @@ export const AnatomyViewport: React.FC<AnatomyViewportProps> = ({
     </div>
   );
 };
+
 export default AnatomyViewport;

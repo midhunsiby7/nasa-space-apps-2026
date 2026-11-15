@@ -13,7 +13,11 @@ import {
   Layers,
   Sparkles,
 } from 'lucide-react';
-import { AnatomicalRegionId, ANATOMICAL_REGIONS } from './anatomyRegistry';
+import {
+  AnatomicalStructureId,
+  ANATOMICAL_STRUCTURES,
+  ANATOMICAL_SYSTEMS,
+} from './anatomyRegistry';
 import { Astronaut } from '../../types/astronaut';
 import { Measurement, MeasurementType } from '../../types/measurement';
 import { BaselineResponse } from '../../types/baseline';
@@ -28,7 +32,8 @@ import {
 } from '../../utils/formatters';
 
 interface RegionTelemetryInspectorProps {
-  regionId: AnatomicalRegionId;
+  structureId?: AnatomicalStructureId | null;
+  regionId?: AnatomicalStructureId;
   astronaut: Astronaut | null;
   measurements: Measurement[];
   baselines?: BaselineResponse[];
@@ -40,9 +45,11 @@ interface RegionTelemetryInspectorProps {
   onNavigateToChart: (metric: MeasurementType) => void;
   onNavigateToBaselines?: (metric: MeasurementType) => void;
   onNavigateToCatalog?: (metric: MeasurementType) => void;
+  onDeselect?: () => void;
 }
 
 export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> = ({
+  structureId,
   regionId,
   astronaut,
   measurements,
@@ -55,25 +62,28 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
   onNavigateToChart,
   onNavigateToBaselines,
   onNavigateToCatalog,
+  onDeselect,
 }) => {
-  const region = ANATOMICAL_REGIONS[regionId];
+  const activeStructureKey = structureId ?? regionId ?? 'heart';
+  const structure = ANATOMICAL_STRUCTURES[activeStructureKey] || ANATOMICAL_STRUCTURES['heart'];
+  const systemMeta = ANATOMICAL_SYSTEMS[structure.systemId];
 
-  // Active tab within the region's telemetry keys
+  // Active tab within the structure's telemetry keys
   const [internalMetric, setInternalMetric] = useState<MeasurementType | null>(
-    region.telemetryKeys.length > 0 ? region.telemetryKeys[0] : null
+    structure.telemetryKeys.length > 0 ? structure.telemetryKeys[0] : null
   );
 
-  // Sync internal metric if region changes or prop changes
+  // Sync internal metric if structure changes or prop changes
   const activeMetric: MeasurementType | null = useMemo(() => {
-    if (region.telemetryKeys.length === 0) return null;
-    if (selectedMetric && region.telemetryKeys.includes(selectedMetric)) {
+    if (structure.telemetryKeys.length === 0) return null;
+    if (selectedMetric && structure.telemetryKeys.includes(selectedMetric)) {
       return selectedMetric;
     }
-    if (internalMetric && region.telemetryKeys.includes(internalMetric)) {
+    if (internalMetric && structure.telemetryKeys.includes(internalMetric)) {
       return internalMetric;
     }
-    return region.telemetryKeys[0];
-  }, [region, selectedMetric, internalMetric]);
+    return structure.telemetryKeys[0];
+  }, [structure, selectedMetric, internalMetric]);
 
   const handleMetricTabClick = (m: MeasurementType) => {
     setInternalMetric(m);
@@ -92,7 +102,7 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
   const baseline = useMemo(() => {
     if (!activeMetric) return null;
     return baselines.find(
-      (b) => b.measurement_type === activeMetric && b.is_active
+      (b) => b.measurement_type === activeMetric && (b.is_active ?? true)
     );
   }, [baselines, activeMetric]);
 
@@ -122,74 +132,93 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
 
   return (
     <div className="flex h-full flex-col space-y-4 overflow-y-auto pr-1">
-      {/* Region Header */}
+      {/* Structure Header Card */}
       <div className="rounded-lg border border-space-700 bg-space-850 p-4 shadow-hud-card">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <span
-                className="h-3 w-3 rounded-full"
-                style={{ backgroundColor: region.color }}
+                className="h-3.5 w-3.5 rounded-full ring-2 ring-space-700"
+                style={{ backgroundColor: structure.color }}
               />
               <h3 className="font-mono text-base font-bold text-space-100">
-                {region.label}
+                {structure.label}
               </h3>
             </div>
-            <p className="font-mono text-xs text-telemetry-cyan mt-0.5">
-              {region.system}
+            <p className="font-mono text-xs text-telemetry-cyan mt-0.5 flex items-center gap-1.5">
+              <span>{structure.systemLabel}</span>
+              {systemMeta && (
+                <span className="text-[10px] text-space-400">
+                  • System ID: {systemMeta.id}
+                </span>
+              )}
             </p>
           </div>
 
-          <div className="flex items-center">
-            {region.isContinuousTelemetryAvailable ? (
+          <div className="flex items-center gap-2">
+            {structure.isContinuousTelemetryAvailable ? (
               <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-400 border border-emerald-500/30">
                 <CheckCircle2 className="h-3 w-3" />
-                CONTINUOUS STREAM ACTIVE
+                STREAMING ACTIVE
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-amber-300 border border-amber-500/30">
                 <Info className="h-3 w-3" />
-                PERIODIC / OFFLINE PROTOCOL
+                PERIODIC / OFFLINE
               </span>
+            )}
+            {onDeselect && (
+              <button
+                onClick={onDeselect}
+                className="rounded px-2 py-0.5 font-mono text-[10px] text-space-400 hover:text-space-200 border border-space-700 hover:bg-space-800"
+                title="Deselect organ and return to whole-body view"
+              >
+                Clear
+              </button>
             )}
           </div>
         </div>
 
-        <p className="mt-2.5 font-mono text-xs leading-relaxed text-space-300">
-          {region.description}
-        </p>
-
-        {/* Scientific Rationale Accordion/Notice */}
-        <div className="mt-3 rounded border border-space-700/60 bg-space-900/60 p-2.5 text-[11px] font-mono text-space-400">
-          <div className="flex items-center gap-1.5 text-telemetry-cyan font-semibold mb-1">
-            <Info className="h-3.5 w-3.5" />
-            <span>Biomedical & Operational Rationale:</span>
+        {/* Physiological Function */}
+        <div className="mt-3 rounded border border-space-700/60 bg-space-900/60 p-2.5 text-xs font-mono text-space-300">
+          <div className="flex items-center gap-1.5 text-telemetry-cyan font-semibold text-[11px] mb-1">
+            <Activity className="h-3.5 w-3.5" />
+            <span>Physiological Function:</span>
           </div>
-          <p className="leading-normal">{region.scientificRationale}</p>
-          {region.clinicalProtocolNotice && (
-            <p className="mt-1.5 text-space-400 border-t border-space-800 pt-1.5 italic">
-              Flight Protocol: {region.clinicalProtocolNotice}
+          <p className="leading-relaxed text-space-200">{structure.physiologicalFunction}</p>
+        </div>
+
+        {/* Biomedical Rationale */}
+        <div className="mt-2.5 rounded border border-space-700/40 bg-space-900/40 p-2.5 text-[11px] font-mono text-space-400">
+          <div className="flex items-center gap-1.5 text-space-300 font-semibold mb-1">
+            <Info className="h-3.5 w-3.5 text-telemetry-cyan" />
+            <span>Spaceflight Operational Rationale:</span>
+          </div>
+          <p className="leading-normal">{structure.scientificRationale}</p>
+          {structure.clinicalProtocolNotice && (
+            <p className="mt-1.5 text-space-300 border-t border-space-800 pt-1.5 italic">
+              Flight Protocol: {structure.clinicalProtocolNotice}
             </p>
           )}
         </div>
 
-        {/* Strict Medical Guardrail Notice */}
+        {/* Scientific Guardrail Notice */}
         <div className="mt-2.5 flex items-start gap-2 rounded bg-space-900/90 border border-telemetry-cyan/25 p-2 text-[10px] font-mono text-space-400">
           <ShieldAlert className="h-3.5 w-3.5 text-telemetry-cyan shrink-0 mt-0.5" />
           <span>
-            <strong className="text-telemetry-cyan">Navigation Interface Guardrail:</strong>{' '}
-            Anatomical highlighting provides spatial categorization of sensors. It is NOT an organ pathology or clinical diagnosis.
+            <strong className="text-telemetry-cyan">Scientific Visualization Notice:</strong>{' '}
+            This anatomical model is an illustrative visualization and is not a patient-specific medical model or clinical diagnostic tool.
           </span>
         </div>
       </div>
 
       {/* CONTINUOUS TELEMETRY INSPECTION SECTION */}
-      {region.isContinuousTelemetryAvailable ? (
+      {structure.isContinuousTelemetryAvailable ? (
         <div className="space-y-4">
           {/* Metric Sub-Tabs */}
-          {region.telemetryKeys.length > 1 && (
+          {structure.telemetryKeys.length > 1 && (
             <div className="flex flex-wrap gap-1.5 border-b border-space-700/80 pb-2">
-              {region.telemetryKeys.map((key) => {
+              {structure.telemetryKeys.map((key) => {
                 const isSelected = activeMetric === key;
                 const mMeta = getMetricMeta(key);
                 return (
@@ -248,295 +277,199 @@ export const RegionTelemetryInspector: React.FC<RegionTelemetryInspectorProps> =
               {/* Value Hero */}
               <div className="mt-3 flex items-baseline gap-2">
                 <span className="font-mono text-3xl font-black text-space-100">
-                  {latestMeasurement !== undefined && latestMeasurement !== null
+                  {latestMeasurement !== null && latestMeasurement !== undefined
                     ? latestMeasurement.value.toFixed(1)
                     : '--'}
                 </span>
-                <span className="font-mono text-sm font-semibold text-space-400">
-                  {latestMeasurement?.unit || activeMeta.unit}
+                <span className="font-mono text-sm text-space-400">
+                  {activeMeta.unit}
                 </span>
                 {astronaut && (
-                  <span className="ml-auto font-mono text-[11px] text-space-400">
-                    Astronaut: <span className="text-space-200">{astronaut.name}</span>
+                  <span className="ml-auto font-mono text-[10px] text-space-400">
+                    Crew: {astronaut.name} ({astronaut.id})
                   </span>
                 )}
               </div>
 
-              <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-space-400">
-                <span>
-                  Timestamp:{' '}
-                  {latestMeasurement
-                    ? formatTimestamp(latestMeasurement.measured_at)
-                    : 'Awaiting Telemetry Packet'}
-                </span>
-                {latestMeasurement?.source && (
-                  <span className="text-space-400">Source: {latestMeasurement.source}</span>
-                )}
+              {/* Measurement Timestamp & Sensor Source */}
+              <div className="mt-2 flex flex-wrap items-center justify-between text-[11px] font-mono text-space-400 border-t border-space-800 pt-2">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-space-500" />
+                  <span>
+                    {latestMeasurement
+                      ? formatTimestamp(latestMeasurement.measured_at)
+                      : 'No live reading'}
+                  </span>
+                </div>
+                <div>
+                  Sensor: <span className="text-space-300">{latestMeasurement?.source || 'BioHarness Telemetry Stream'}</span>
+                </div>
               </div>
 
-              {/* Quick Jump to Chart */}
-              <button
-                onClick={() => onNavigateToChart(activeMetric)}
-                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded bg-space-800/80 hover:bg-space-750 px-3 py-1.5 font-mono text-xs text-telemetry-cyan border border-space-700 transition-colors"
-              >
-                <ExternalLink className="h-3 w-3" />
-                <span>Plot Time-Series Stream in Telemetry Tab</span>
-              </button>
-            </div>
-          )}
-
-          {/* Personal Operational Baseline Comparison */}
-          <div className="rounded-lg border border-space-700 bg-space-850 p-4 shadow-hud-card">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Layers className="h-3.5 w-3.5 text-telemetry-cyan" />
-                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-space-200">
-                  Personal Operational Baseline
-                </h4>
-              </div>
-              {baseline && (
-                <span className="rounded bg-space-800 px-2 py-0.5 font-mono text-[10px] text-space-300 border border-space-700">
-                  {(baseline.baseline_type || 'inflight').toUpperCase()} • v{baseline.version || 1} • {baseline.maturity || 'provisional'}
-                </span>
-              )}
-            </div>
-
-            {baseline ? (
-              <div className="space-y-2.5 font-mono text-xs">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded bg-space-900 p-2 border border-space-800">
-                    <span className="text-[10px] text-space-400 block">Baseline Median</span>
-                    <span className="font-bold text-space-100 text-sm">
-                      {baseline.envelope.median.toFixed(1)} {baseline.unit}
+              {/* Baseline Comparison Envelope */}
+              {baseline && baseline.envelope ? (
+                <div className="mt-3 rounded border border-space-700/80 bg-space-900 p-2.5">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-space-400">Personal Baseline Envelope:</span>
+                    <span className="font-bold text-telemetry-cyan">
+                      {baseline.envelope.q25.toFixed(1)} – {baseline.envelope.q75.toFixed(1)} {activeMeta.unit}
                     </span>
                   </div>
-                  <div className="rounded bg-space-900 p-2 border border-space-800">
-                    <span className="text-[10px] text-space-400 block">IQR [Q25 – Q75]</span>
-                    <span className="font-bold text-space-100 text-sm">
-                      {baseline.envelope.q25.toFixed(1)} – {baseline.envelope.q75.toFixed(1)} {baseline.unit}
-                    </span>
+                  <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-space-500">
+                    <span>Median: {baseline.envelope.median.toFixed(1)} {activeMeta.unit}</span>
+                    <span>Status: {baseline.maturity ? `${baseline.maturity.toUpperCase()} BASELINE` : 'ACTIVE BASELINE'}</span>
                   </div>
                 </div>
+              ) : (
+                <div className="mt-3 rounded border border-space-800 bg-space-900/60 p-2 text-center font-mono text-[11px] text-space-500">
+                  No active personal baseline computed for this astronaut.
+                </div>
+              )}
 
-                {trend?.robust_z !== undefined && trend.robust_z !== null && (
-                  <div className="flex items-center justify-between rounded bg-space-900/80 p-2 border border-space-800 text-[11px]">
-                    <span className="text-space-400">Robust Z-Deviation:</span>
-                    <span
-                      className={`font-bold ${
-                        Math.abs(trend.robust_z) >= 3.0
-                          ? 'text-rose-400'
-                          : Math.abs(trend.robust_z) >= 2.0
-                          ? 'text-amber-400'
-                          : 'text-emerald-400'
-                      }`}
-                    >
-                      {trend.robust_z > 0 ? '+' : ''}
-                      {trend.robust_z.toFixed(2)} σ (MAD-scale)
+              {/* Trend Trajectory Observation */}
+              {trend ? (
+                <div className="mt-3 rounded border border-space-700/80 bg-space-900 p-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-space-400">Empirical Trend Direction:</span>
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-space-200">
+                      {trend.trend_direction === 'increasing' && (
+                        <>
+                          <TrendingUp className="h-3.5 w-3.5 text-amber-400" />
+                          <span className="text-amber-400">Ascending</span>
+                        </>
+                      )}
+                      {trend.trend_direction === 'decreasing' && (
+                        <>
+                          <TrendingDown className="h-3.5 w-3.5 text-telemetry-cyan" />
+                          <span className="text-telemetry-cyan">Descending</span>
+                        </>
+                      )}
+                      {trend.trend_direction === 'stable' && (
+                        <>
+                          <Minus className="h-3.5 w-3.5 text-emerald-400" />
+                          <span className="text-emerald-400">Stable</span>
+                        </>
+                      )}
+                      {trend.trend_direction === 'sustained_deviation' && (
+                        <>
+                          <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+                          <span className="text-rose-400">Sustained Deviation</span>
+                        </>
+                      )}
                     </span>
                   </div>
-                )}
-                <p className="text-[10px] text-space-400 italic">
-                  Envelope calculated from {baseline.envelope.sample_count} verified readings.
-                </p>
-                {onNavigateToBaselines && activeMetric && (
+                  <div className="mt-1 text-[10px] font-mono text-space-400">
+                    Sen&apos;s slope: {trend.sens_slope != null ? trend.sens_slope.toFixed(3) : '0.000'} {activeMeta.unit}/hr • Sample count: {trend.sample_count}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Health Alerts if any */}
+              {regionAlerts.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>Active Telemetry Notifications ({regionAlerts.length}):</span>
+                  </div>
+                  {regionAlerts.map((alt) => (
+                    <div
+                      key={alt.id}
+                      className="rounded border border-amber-500/30 bg-amber-500/10 p-2 text-xs font-mono text-amber-200"
+                    >
+                      <div className="font-bold">{alt.title}</div>
+                      <div className="text-[10px] text-amber-300 mt-0.5">{alt.explanation}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Assessment Findings if any */}
+              {assessmentFindings.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-space-400 font-bold flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-telemetry-cyan" />
+                    <span>Clinical Assessment Findings ({assessmentFindings.length}):</span>
+                  </div>
+                  {assessmentFindings.map((finding, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded border border-space-700 bg-space-900/80 p-2 text-xs font-mono text-space-300"
+                    >
+                      <div className="text-space-200">{finding.summary}</div>
+                      <div className="text-[10px] text-telemetry-cyan mt-1 flex items-center gap-2">
+                        <span>Status: {finding.status}</span>
+                        {finding.trend && <span>• Trend: {finding.trend}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Deep Navigation Action Links */}
+              <div className="mt-4 pt-3 border-t border-space-800 flex flex-wrap gap-2">
+                <button
+                  onClick={() => onNavigateToChart(activeMetric)}
+                  className="flex items-center gap-1.5 rounded bg-space-800 hover:bg-space-750 px-3 py-1.5 font-mono text-xs text-telemetry-cyan border border-space-700 hover:border-telemetry-cyan/50 transition-colors"
+                >
+                  <Activity className="h-3.5 w-3.5" />
+                  <span>Telemetry Explorer</span>
+                  <ExternalLink className="h-3 w-3 ml-0.5 opacity-60" />
+                </button>
+
+                {onNavigateToBaselines && (
                   <button
                     onClick={() => onNavigateToBaselines(activeMetric)}
-                    className="flex w-full items-center justify-center gap-1.5 rounded bg-telemetry-cyan/15 hover:bg-telemetry-cyan/25 border border-telemetry-cyan/40 px-2.5 py-1.5 font-mono text-xs text-telemetry-cyan font-semibold transition-colors mt-2"
+                    className="flex items-center gap-1.5 rounded bg-space-800 hover:bg-space-750 px-3 py-1.5 font-mono text-xs text-space-300 hover:text-space-100 border border-space-700 transition-colors"
                   >
-                    <TrendingUp className="h-3 w-3" />
-                    <span>Inspect Operational Envelopes in Baselines</span>
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>Personal Baselines</span>
                   </button>
                 )}
-                {onNavigateToCatalog && activeMetric && (
+
+                {onNavigateToCatalog && (
                   <button
                     onClick={() => onNavigateToCatalog(activeMetric)}
-                    className="flex w-full items-center justify-center gap-1.5 rounded bg-space-800 hover:bg-space-750 border border-space-700 px-2.5 py-1.5 font-mono text-xs text-space-300 hover:text-space-100 transition-colors"
+                    className="flex items-center gap-1.5 rounded bg-space-800 hover:bg-space-750 px-3 py-1.5 font-mono text-xs text-space-300 hover:text-space-100 border border-space-700 transition-colors"
                   >
-                    <span>View Metric Sanity Guards in Catalog</span>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Catalog</span>
                   </button>
                 )}
-              </div>
-            ) : (
-              <p className="font-mono text-xs text-space-400 italic">
-                No finalized operational baseline registered for this astronaut and metric yet.
-              </p>
-            )}
-          </div>
-
-          {/* Health Trend Intelligence */}
-          <div className="rounded-lg border border-space-700 bg-space-850 p-4 shadow-hud-card">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-telemetry-cyan" />
-                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-space-200">
-                  Trend Velocity & Trajectory
-                </h4>
-              </div>
-              {trend && (
-                <div className="flex items-center gap-1 font-mono text-[10px]">
-                  {trend.trend_direction === 'increasing' && (
-                    <span className="flex items-center text-rose-400 font-bold">
-                      <TrendingUp className="h-3 w-3 mr-0.5" /> INCREASING
-                    </span>
-                  )}
-                  {trend.trend_direction === 'decreasing' && (
-                    <span className="flex items-center text-amber-400 font-bold">
-                      <TrendingDown className="h-3 w-3 mr-0.5" /> DECREASING
-                    </span>
-                  )}
-                  {trend.trend_direction === 'stable' && (
-                    <span className="flex items-center text-emerald-400 font-bold">
-                      <Minus className="h-3 w-3 mr-0.5" /> STABLE
-                    </span>
-                  )}
-                  {trend.trend_direction === 'sustained_deviation' && (
-                    <span className="flex items-center text-purple-400 font-bold">
-                      <AlertTriangle className="h-3 w-3 mr-0.5" /> SUSTAINED DEVIATION
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {trend ? (
-              <div className="space-y-2 font-mono text-xs">
-                <div className="flex items-center justify-between rounded bg-space-900 p-2 border border-space-800">
-                  <span className="text-[11px] text-space-400">Sen&apos;s Slope Rate of Change (24h):</span>
-                  <span className="font-bold text-space-200">
-                    {trend.sens_slope !== null && trend.sens_slope !== undefined
-                      ? `${trend.sens_slope > 0 ? '+' : ''}${trend.sens_slope.toFixed(2)} ${trend.unit} / 24h`
-                      : 'N/A'}
-                  </span>
-                </div>
-                {trend.explanation && (
-                  <p className="text-[11px] leading-relaxed text-space-300 bg-space-900/50 p-2 rounded border border-space-800/60">
-                    {trend.explanation}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="font-mono text-xs text-space-400 italic">
-                Trend analysis calculation requires active telemetry stream.
-              </p>
-            )}
-          </div>
-
-          {/* Active Alerts for this Region */}
-          {regionAlerts.length > 0 && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-950/20 p-3.5 shadow-hud-card">
-              <div className="flex items-center gap-1.5 text-amber-400 font-mono text-xs font-bold mb-2">
-                <AlertTriangle className="h-4 w-4" />
-                <span>Active Alerts for this System ({regionAlerts.length})</span>
-              </div>
-              <div className="space-y-2">
-                {regionAlerts.map((alt) => (
-                  <div
-                    key={alt.id}
-                    className="rounded bg-space-900/90 p-2.5 border border-amber-500/30 text-xs font-mono"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-amber-200">{alt.title}</span>
-                      <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300 uppercase">
-                        {alt.severity}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-space-300 mt-1">{alt.explanation}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Assessment Findings for this Metric */}
-          {assessmentFindings.length > 0 && (
-            <div className="rounded-lg border border-space-700 bg-space-850 p-3.5 shadow-hud-card">
-              <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-space-200 mb-2">
-                Clinical Assessment Notes
-              </h4>
-              <div className="space-y-2">
-                {assessmentFindings.map((finding, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded bg-space-900 p-2.5 border border-space-800 text-xs font-mono"
-                  >
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-telemetry-cyan uppercase">
-                        {finding.status}
-                      </span>
-                      <span className="text-space-400">Trend: {finding.trend}</span>
-                    </div>
-                    <p className="text-[11px] text-space-300 mt-1">{finding.summary}</p>
-                  </div>
-                ))}
               </div>
             </div>
           )}
         </div>
       ) : (
-        /* UNAVAILABLE TELEMETRY SECTION (MUSCULOSKELETAL & OCULAR) */
-        <div className="space-y-4">
-          <div className="rounded-lg border border-purple-500/40 bg-purple-950/20 p-4 shadow-hud-card">
-            <div className="flex items-center gap-2 text-purple-300 font-mono text-xs font-bold uppercase tracking-wider">
-              <ShieldAlert className="h-4 w-4 text-purple-400" />
-              <span>Continuous In-Flight Telemetry Unavailable</span>
-            </div>
-
-            <p className="font-mono text-xs text-space-300 mt-2.5 leading-relaxed">
-              In spaceflight operational medicine, this anatomical system does not utilize continuous
-              streaming wearable biosensors. Telemetry is neither missing nor failing; it is
-              governed by scheduled periodic diagnostic protocols.
-            </p>
-
-            {/* Crucial Scientific Warning */}
-            <div className="mt-3 rounded bg-space-900/90 border border-purple-500/30 p-2.5 font-mono text-[11px] text-purple-200">
-              <strong className="text-purple-300">Operational Flight Rule:</strong> Absence of continuous telemetry
-              does NOT indicate nominal physiology or zero medical risk. Microgravity progressive deconditioning
-              (e.g., bone mineral demineralization or cephalad optic disc edema) requires mandatory periodic evaluation.
-            </div>
-          </div>
-
-          {/* System Protocol Details */}
-          <div className="rounded-lg border border-space-700 bg-space-850 p-4 shadow-hud-card font-mono text-xs space-y-3">
-            <h4 className="font-bold text-space-100 flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-telemetry-cyan" />
-              <span>Standard Flight Medical Protocol</span>
+        /* OFFLINE / PERIODIC PROTOCOL NOTICE */
+        <div className="rounded-lg border border-space-700 bg-space-850 p-4 shadow-hud-card space-y-3">
+          <div className="flex items-center gap-2 text-amber-400">
+            <Info className="h-4 w-4" />
+            <h4 className="font-mono text-xs font-bold uppercase tracking-wider">
+              No associated measurement available
             </h4>
-
-            {region.id === 'ocular' && (
-              <div className="space-y-2 text-space-300 text-[11px] leading-relaxed">
-                <p>
-                  <strong>Spaceflight-Associated Neuro-ocular Syndrome (SANS):</strong> In-flight surveillance
-                  follows scheduled periodic diagnostic imaging protocols (e.g., illustrative 30-to-60 day cadence per
-                  NASA Spaceflight Standard Measures protocol; specific schedule defined by mission flight rules) via
-                  bilateral Optical Coherence Tomography (OCT) scans, dilated funduscopic imaging, and visual acuity charts.
-                </p>
-                <p className="text-space-400 italic">
-                  Data provenance: Periodic ophthalmology imaging packets are transmitted to Ground Flight Surgeons at Johnson Space Center (JSC).
-                </p>
-              </div>
-            )}
-
-            {region.id === 'musculoskeletal' && (
-              <div className="space-y-2 text-space-300 text-[11px] leading-relaxed">
-                <p>
-                  <strong>Axial Skeleton & Muscle Mass Preservation:</strong> Managed under NASA flight rules allocating
-                  2.5 hours total daily exercise time, comprising ~60–90 minutes of dedicated resistive loading on ARED
-                  (Advanced Resistive Exercise Device), ~30–45 minutes of aerobic conditioning on the T2 Treadmill or
-                  CEVIS cycle ergometer, plus setup and personal hygiene.
-                </p>
-                <p className="text-space-400 italic">
-                  Bone mineral density (BMD) is formally evaluated via pre-flight and post-flight dual-energy X-ray absorptiometry (DXA).
-                </p>
-              </div>
-            )}
-
-            <div className="pt-2 border-t border-space-800 flex items-center justify-between text-[10px] text-space-400">
-              <span>Flight Protocol Standard: NASA-STD-3001 & Standard Measures</span>
-              <span className="text-telemetry-cyan">Protocol Schedule Active</span>
-            </div>
           </div>
+
+          <p className="font-mono text-xs leading-relaxed text-space-300">
+            This anatomical structure is monitored through scheduled in-flight testing, countermeasure exercise logs, or pre-/post-flight clinical imaging rather than continuous telemetry streaming.
+          </p>
+
+          <div className="rounded border border-space-800 bg-space-900 p-3 space-y-2 text-xs font-mono">
+            <div className="font-bold text-space-200">Operational Surveillance Protocol:</div>
+            <p className="text-space-400 leading-normal">
+              {structure.notes || 'Tracked through mission flight rules and periodic crew health protocols.'}
+            </p>
+          </div>
+
+          {structure.clinicalProtocolNotice && (
+            <div className="rounded border border-purple-500/20 bg-purple-900/10 p-2.5 text-[11px] font-mono text-purple-200">
+              <span className="font-bold text-purple-300">Countermeasure Rule:</span>{' '}
+              {structure.clinicalProtocolNotice}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
+
+export default RegionTelemetryInspector;
