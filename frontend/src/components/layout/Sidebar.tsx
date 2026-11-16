@@ -12,6 +12,7 @@ import {
   Calendar,
   Sparkles,
   Layers,
+  FlaskConical,
 } from 'lucide-react';
 import { Astronaut } from '../../types/astronaut';
 import { MeasurementType } from '../../types/measurement';
@@ -28,7 +29,8 @@ export type ActiveTab =
   | 'trends'
   | 'alerts'
   | 'assessments'
-  | 'timeline';
+  | 'timeline'
+  | 'research';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -134,6 +136,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: (
         <span className="rounded bg-sky-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-sky-400 border border-sky-500/30">
           10
+        </span>
+      ),
+    },
+    {
+      id: 'research',
+      label: 'Research Catalogue',
+      icon: <FlaskConical className="h-4 w-4 text-emerald-400" />,
+      badge: (
+        <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-emerald-400 border border-emerald-500/30">
+          OSDR
         </span>
       ),
     },

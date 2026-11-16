@@ -1,0 +1,233 @@
+[
+  {
+    "suite": "Startup",
+    "id": "A-1",
+    "name": "FastAPI Backend Service Startup",
+    "status": "PASS",
+    "details": "HTTP 200 /api/v1/health verified"
+  },
+  {
+    "suite": "Startup",
+    "id": "A-2",
+    "name": "Vite Frontend Server Startup",
+    "status": "PASS",
+    "details": "HTTP 200 http://127.0.0.1:5173/ reachable"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-1",
+    "name": "Header & Mission Branding",
+    "status": "PASS",
+    "details": "Title: 'COSMOLOOKUP \u2014 Astronaut Health & Mission Telemetry' with COSMOLOOKUP HUD"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-2",
+    "name": "Mission Dashboard & Health Cockpit",
+    "status": "PASS",
+    "details": "All 6 KPI cards, telemetry stream freshness, and active crew cockpit active"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-3",
+    "name": "Astronaut Roster Directory",
+    "status": "PASS",
+    "details": "All 5 astronaut profiles rendered with mission days, role, and vitals"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-4",
+    "name": "Astronaut Profile Modal",
+    "status": "PASS",
+    "details": "Modal opened with full biomedical baseline specifications and flight credentials"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-5",
+    "name": "Telemetry Explorer & Recharts Time-Series",
+    "status": "PASS",
+    "details": "Recharts SVG chart and audited raw telemetry data table rendered with context filters"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-6",
+    "name": "Measurement Catalog & Taxonomy",
+    "status": "PASS",
+    "details": "10 canonical metrics, physical sanity bounds, accepted aliases, and context taxonomy displayed"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-7",
+    "name": "Personal Baseline Explorer & Envelopes",
+    "status": "PASS",
+    "details": "Non-parametric envelope (Median, IQR, Robust Scale, Lifecycle) verified"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-8",
+    "name": "Interactive 3D Holographic Anatomy Canvas",
+    "status": "PASS",
+    "details": "WebGL Three.js canvas / SVG holographic fallback active"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-9",
+    "name": "Non-Anatomical Habitat Telemetry Drawer",
+    "status": "PASS",
+    "details": "Radiation ALARA, ECLSS, PVT channels isolated from anatomical mannequin"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-10",
+    "name": "Mission Intelligence Center",
+    "status": "PASS",
+    "details": "Classification tiers, telemetry freshness monitor, trend trajectories, and operational alerts verified"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-11",
+    "name": "Trend Observatory & Sen's Slope Integrity",
+    "status": "PASS",
+    "details": "Sen's slope rates of change strictly formatted in units per 24 hours"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-12",
+    "name": "Alert Command Desk & Triage Queue",
+    "status": "PASS",
+    "details": "Operational alert desk rendered with status & severity filters, acknowledgement, and resolution workflows"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-13",
+    "name": "Assessment Workspace & Explainable Guidance",
+    "status": "PASS",
+    "details": "Synthesis summary narrative, findings table, and guidance recommendations verified"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-14",
+    "name": "Reconstructed Mission Timeline",
+    "status": "PASS",
+    "details": "Chronological stream with mandatory reconstructed notice and timestamp separation"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-15",
+    "name": "Crew Evidence Report Modal",
+    "status": "PASS",
+    "details": "Markdown export, printable layout, and flight operations disclosure verified"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-16",
+    "name": "Global Command Palette (Ctrl+K)",
+    "status": "PASS",
+    "details": "Keyboard shortcut modal opened with search and navigation actions"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-17",
+    "name": "NASA OSDR Research Explorer & Central Judge Communication",
+    "status": "PASS",
+    "details": "Verified central judge message, 15 curated empirical studies, category filters, and telemetry decoupling"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-18",
+    "name": "Research Study Dossier Modal & Scientific Limitations",
+    "status": "PASS",
+    "details": "Detailed abstract, biological endpoints, translational guardrails, and official NASA OSDR link verified"
+  },
+  {
+    "suite": "Accessibility",
+    "id": "B-18a",
+    "name": "Research Study Modal Accessibility & Focus Management",
+    "status": "PASS",
+    "details": "role=dialog, aria-modal, focus trapping, Escape dismiss, and background isolation verified"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-19",
+    "name": "3D Anatomy Contextual Research Bridge",
+    "status": "PASS",
+    "details": "Seamless deep-link from anatomical region inspector to targeted NASA OSDR empirical evidence verified"
+  },
+  {
+    "suite": "Screens",
+    "id": "B-20",
+    "name": "Offline-First Research Experience",
+    "status": "PASS",
+    "details": "All 15 curated NASA OSDR studies operate seamlessly offline in disconnected demo mode"
+  },
+  {
+    "suite": "Responsive",
+    "id": "C-1",
+    "name": "Tablet Layout (768 x 1024)",
+    "status": "PASS",
+    "details": "Horizontal scroll overflow: False"
+  },
+  {
+    "suite": "Responsive",
+    "id": "C-2",
+    "name": "Mobile Layout (375 x 667)",
+    "status": "PASS",
+    "details": "Horizontal scroll overflow: False"
+  },
+  {
+    "suite": "Responsive",
+    "id": "C-3",
+    "name": "Large Desktop HUD (1920 x 1080)",
+    "status": "PASS",
+    "details": "Standard 1080p full-width operational layout"
+  },
+  {
+    "suite": "Reliability",
+    "id": "D-1",
+    "name": "Browser Console Health",
+    "status": "PASS",
+    "details": "0 runtime console errors detected during full test run"
+  },
+  {
+    "suite": "Reliability",
+    "id": "D-2",
+    "name": "HTTP Network Request Integrity",
+    "status": "PASS",
+    "details": "0 failed API requests (no 4xx/5xx responses)"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-1",
+    "name": "Microsoft Edge Rendering & Compatibility",
+    "status": "PASS",
+    "details": "Rendered cleanly in Edge with title: 'COSMOLOOKUP \u2014 Astronaut Health & Mission Telemetry'"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-2",
+    "name": "Microsoft Edge Research Explorer View",
+    "status": "PASS",
+    "details": "NASA OSDR Research Catalogue rendered cleanly on Edge with 15 curated empirical studies"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-3",
+    "name": "Microsoft Edge Research Filtering & Search",
+    "status": "PASS",
+    "details": "Multi-dimensional filter console operates with interactive responsiveness on Edge"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-4",
+    "name": "Microsoft Edge Research Study Modal & Accessibility",
+    "status": "PASS",
+    "details": "role=dialog, aria-modal, focus trapping, Escape dismiss, and scientific limitations verified on Edge"
+  },
+  {
+    "suite": "CrossBrowser",
+    "id": "E-5",
+    "name": "Microsoft Edge 3D Anatomy & Research Contextual Bridge",
+    "status": "PASS",
+    "details": "Contextual deep-link from anatomical region inspector to targeted NASA OSDR evidence operates seamlessly on Edge"
+  }
+]

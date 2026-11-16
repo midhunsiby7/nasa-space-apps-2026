@@ -19,6 +19,7 @@ import { NonAnatomicalDataDrawer } from './components/anatomy/NonAnatomicalDataD
 import { JudgeDemoController } from './components/demo/JudgeDemoController';
 import { PersonalBaselinesView } from './components/baselines/PersonalBaselinesView';
 import { MeasurementCatalogView } from './components/catalog/MeasurementCatalogView';
+import { ResearchExplorerView } from './components/research/ResearchExplorerView';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ErrorMessage } from './components/common/ErrorMessage';
 import { Astronaut } from './types/astronaut';
@@ -42,6 +43,7 @@ export const App: React.FC = () => {
   const [totalMeasurements, setTotalMeasurements] = useState<number>(0);
   const [selectedMetric, setSelectedMetric] = useState<MeasurementType>('heart_rate');
   const [timeFilter, setTimeFilter] = useState<'all' | '8h' | '24h'>('all');
+  const [selectedResearchBodySystem, setSelectedResearchBodySystem] = useState<string | undefined>(undefined);
 
   // Intelligence & Alerts Data State
   const [baselines, setBaselines] = useState<BaselineResponse[]>([]);
@@ -321,7 +323,7 @@ export const App: React.FC = () => {
     >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Selected Astronaut Status Banner */}
-        {selectedAstronaut && activeTab !== 'roster' && activeTab !== 'catalog' && (
+        {selectedAstronaut && activeTab !== 'roster' && activeTab !== 'catalog' && activeTab !== 'research' && (
           <SelectedAstronautBanner
             astronaut={selectedAstronaut}
             latestMeasurements={latestMeasurementsMap}
@@ -539,6 +541,17 @@ export const App: React.FC = () => {
                   setSelectedMetric(metric);
                   setActiveTab('baselines');
                 }}
+                onNavigateToResearch={(system) => {
+                  setSelectedResearchBodySystem(system);
+                  setActiveTab('research');
+                }}
+              />
+            )}
+
+            {activeTab === 'research' && (
+              <ResearchExplorerView
+                initialBodySystem={selectedResearchBodySystem}
+                onNavigateToAnatomy={() => setActiveTab('anatomy')}
               />
             )}
           </>
